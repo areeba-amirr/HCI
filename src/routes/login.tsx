@@ -6,7 +6,8 @@ import { Pill, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
-  validateSearch: (s: Record<string, unknown>) => ({ signup: s.signup === "success" ? "success" : undefined }),
+  validateSearch: (s: Record<string, unknown>): { signup?: "success" } =>
+    s.signup === "success" ? { signup: "success" } : {},
   head: () => ({
     meta: [
       { title: "Login — MediSnap" },
