@@ -6,7 +6,17 @@ import { Pill, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/signup")({
   component: SignupPage,
-  head: () => ({ meta: [{ title: "Sign up — MediSnap" }] }),
+  head: () => ({
+    meta: [
+      { title: "Sign up — MediSnap" },
+      { name: "description", content: "Create a free MediSnap account to scan medicine labels, decode prescriptions in Urdu and track your daily symptoms." },
+      { property: "og:title", content: "Sign up — MediSnap" },
+      { property: "og:description", content: "Create a free MediSnap account and start understanding your medicines in Urdu today." },
+      { property: "og:url", content: "/signup" },
+    ],
+    links: [{ rel: "canonical", href: "/signup" }],
+  }),
+
 });
 
 function SignupPage() {

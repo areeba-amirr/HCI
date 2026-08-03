@@ -5,10 +5,15 @@ export const Route = createFileRoute("/")({
   component: Landing,
   head: () => ({
     meta: [
-      { title: "MediSnap — Snap. Understand. Stay Safe." },
-      { name: "description", content: "Scan any English medicine or prescription and instantly understand it in Urdu. Track symptoms, generate doctor reports." },
+      { title: "MediSnap — Medicine Labels Explained in Urdu" },
+      { name: "description", content: "Scan any English medicine label or doctor prescription and instantly understand dosage, timing and warnings in clear Urdu." },
+      { property: "og:title", content: "Home — MediSnap" },
+      { property: "og:description", content: "Scan English medicine labels and prescriptions and understand them in clear Urdu, with symptom tracking and doctor reports." },
+      { property: "og:url", content: "/" },
     ],
+    links: [{ rel: "canonical", href: "/" }],
   }),
+
 });
 
 function Landing() {
@@ -53,7 +58,9 @@ function Landing() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div>
+            <h2 className="sr-only">What MediSnap does</h2>
+            <div className="grid grid-cols-2 gap-4">
             {[
               { icon: ScanLine, title: "Medicine Scanner", desc: "Scan any pill bottle." },
               { icon: FileText, title: "Prescription Reader", desc: "Decodes handwriting." },
@@ -64,8 +71,9 @@ function Landing() {
                 <Icon className="h-6 w-6 text-primary" />
                 <h3 className="mt-3 font-semibold">{title}</h3>
                 <p className="text-sm text-muted-foreground">{desc}</p>
-              </div>
-            ))}
+                </div>
+              ))}
+            </div>
           </div>
         </section>
       </main>

@@ -8,6 +8,15 @@ import { Search, Trash2, Loader2, Pill, ShieldCheck, AlertTriangle, FileText, X,
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/history")({
+  head: () => ({
+    meta: [
+      { title: "Scan History — MediSnap" },
+      { name: "description", content: "Browse, search and review every medicine and prescription you have scanned with MediSnap." },
+      { property: "og:title", content: "Scan History — MediSnap" },
+      { property: "og:description", content: "Browse, search and review every medicine and prescription you have scanned with MediSnap." },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
   component: HistoryPage,
 });
 
@@ -250,7 +259,7 @@ function ViewModal({ group, onClose }: { group: Group; onClose: () => void }) {
             </h2>
             <p className="text-xs text-muted-foreground">{format(new Date(group.created_at), "PPP — p")}</p>
           </div>
-          <button onClick={onClose} className="rounded-md p-2 hover:bg-accent"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} aria-label="Close details" className="rounded-md p-2 hover:bg-accent"><X className="h-4 w-4" /></button>
         </div>
         <div className="space-y-4 p-5">
           {!isEmpty(interactions) && (

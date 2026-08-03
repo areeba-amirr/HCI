@@ -7,6 +7,15 @@ import { Loader2, Upload, Save, RefreshCcw, AlertTriangle, Pill, Clock, Utensils
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/scanner")({
+  head: () => ({
+    meta: [
+      { title: "Scan Medicine — MediSnap" },
+      { name: "description", content: "Upload or photograph a medicine label and get dosage, frequency, warnings and food interactions in Urdu." },
+      { property: "og:title", content: "Scan Medicine — MediSnap" },
+      { property: "og:description", content: "Upload or photograph a medicine label and get dosage, frequency, warnings and food interactions in Urdu." },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
   component: ScannerPage,
 });
 
@@ -100,7 +109,7 @@ function ScannerPage() {
             }`}
           >
             {preview ? (
-              <img src={preview} alt="Preview" className="max-h-[40vh] w-auto rounded-lg object-contain" />
+              <img src={preview} alt="Uploaded medicine label preview" className="max-h-[40vh] w-auto rounded-lg object-contain" />
             ) : (
               <>
                 <div className="grid h-14 w-14 place-items-center rounded-full bg-primary/10 text-primary">
