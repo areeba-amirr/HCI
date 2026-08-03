@@ -250,7 +250,7 @@ function ViewModal({ group, onClose }: { group: Group; onClose: () => void }) {
             </h2>
             <p className="text-xs text-muted-foreground">{format(new Date(group.created_at), "PPP — p")}</p>
           </div>
-          <button onClick={onClose} className="rounded-md p-2 hover:bg-accent"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} aria-label="Close details" className="rounded-md p-2 hover:bg-accent"><X className="h-4 w-4" /></button>
         </div>
         <div className="space-y-4 p-5">
           {!isEmpty(interactions) && (

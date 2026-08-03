@@ -119,7 +119,7 @@ function PrescriptionPage() {
             }`}
           >
             {preview ? (
-              <img src={preview} alt="Preview" className="max-h-[40vh] w-auto rounded-lg object-contain" />
+              <img src={preview} alt="Uploaded prescription image preview" className="max-h-[40vh] w-auto rounded-lg object-contain" />
             ) : (
               <>
                 <div className="grid h-14 w-14 place-items-center rounded-full bg-primary/10 text-primary">

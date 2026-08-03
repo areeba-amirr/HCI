@@ -211,9 +211,9 @@ function ReportPage() {
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Health calendar</h2>
           <div className="flex items-center gap-2">
-            <button onClick={() => setMonth(subMonths(month, 1))} className="rounded-md p-2 hover:bg-accent"><ChevronLeft className="h-4 w-4" /></button>
+            <button onClick={() => setMonth(subMonths(month, 1))} aria-label="Previous month" className="rounded-md p-2 hover:bg-accent"><ChevronLeft className="h-4 w-4" /></button>
             <span className="text-sm font-medium w-32 text-center">{format(month, "MMMM yyyy")}</span>
-            <button onClick={() => setMonth(addMonths(month, 1))} className="rounded-md p-2 hover:bg-accent"><ChevronRight className="h-4 w-4" /></button>
+            <button onClick={() => setMonth(addMonths(month, 1))} aria-label="Next month" className="rounded-md p-2 hover:bg-accent"><ChevronRight className="h-4 w-4" /></button>
           </div>
         </div>
         <div className="mt-4 grid grid-cols-7 gap-1.5 text-center text-xs">

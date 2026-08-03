@@ -53,7 +53,9 @@ function Landing() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div>
+            <h2 className="sr-only">What MediSnap does</h2>
+            <div className="grid grid-cols-2 gap-4">
             {[
               { icon: ScanLine, title: "Medicine Scanner", desc: "Scan any pill bottle." },
               { icon: FileText, title: "Prescription Reader", desc: "Decodes handwriting." },
@@ -64,8 +66,9 @@ function Landing() {
                 <Icon className="h-6 w-6 text-primary" />
                 <h3 className="mt-3 font-semibold">{title}</h3>
                 <p className="text-sm text-muted-foreground">{desc}</p>
-              </div>
-            ))}
+                </div>
+              ))}
+            </div>
           </div>
         </section>
       </main>
