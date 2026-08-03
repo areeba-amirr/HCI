@@ -8,6 +8,15 @@ import { Search, Trash2, Loader2, Pill, ShieldCheck, AlertTriangle, FileText, X,
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/history")({
+  head: () => ({
+    meta: [
+      { title: "Scan History — MediSnap" },
+      { name: "description", content: "Browse, search and review every medicine and prescription you have scanned with MediSnap." },
+      { property: "og:title", content: "Scan History — MediSnap" },
+      { property: "og:description", content: "Browse, search and review every medicine and prescription you have scanned with MediSnap." },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
   component: HistoryPage,
 });
 

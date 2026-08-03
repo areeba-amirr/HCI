@@ -4,6 +4,15 @@ import { ScanLine, FileText, Mic, FileBarChart, History, ArrowRight } from "luci
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
+  head: () => ({
+    meta: [
+      { title: "Dashboard — MediSnap" },
+      { name: "description", content: "Your MediSnap dashboard: today's health reminder, recent scans and quick access to every tool." },
+      { property: "og:title", content: "Dashboard — MediSnap" },
+      { property: "og:description", content: "Your MediSnap dashboard: today's health reminder, recent scans and quick access to every tool." },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
   component: Dashboard,
 });
 

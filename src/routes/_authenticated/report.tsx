@@ -14,6 +14,15 @@ import { toast } from "sonner";
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler);
 
 export const Route = createFileRoute("/_authenticated/report")({
+  head: () => ({
+    meta: [
+      { title: "Doctor Report — MediSnap" },
+      { name: "description", content: "See your health trends on charts and generate a printable PDF report to share with your doctor." },
+      { property: "og:title", content: "Doctor Report — MediSnap" },
+      { property: "og:description", content: "See your health trends on charts and generate a printable PDF report to share with your doctor." },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
   component: ReportPage,
 });
 

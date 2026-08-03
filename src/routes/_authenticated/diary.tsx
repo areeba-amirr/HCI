@@ -7,6 +7,15 @@ import { Mic, Loader2, Save, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/diary")({
+  head: () => ({
+    meta: [
+      { title: "Symptom Diary — MediSnap" },
+      { name: "description", content: "Record your daily symptoms by voice in Urdu or English and track pain, sleep and mood over time." },
+      { property: "og:title", content: "Symptom Diary — MediSnap" },
+      { property: "og:description", content: "Record your daily symptoms by voice in Urdu or English and track pain, sleep and mood over time." },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
   component: DiaryPage,
 });
 

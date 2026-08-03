@@ -7,6 +7,15 @@ import { Loader2, Upload, Save, RefreshCcw, FileText, AlertTriangle } from "luci
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/prescription")({
+  head: () => ({
+    meta: [
+      { title: "Prescription Reader — MediSnap" },
+      { name: "description", content: "Upload a doctor's prescription and decode every medicine, abbreviation and instruction into clear Urdu." },
+      { property: "og:title", content: "Prescription Reader — MediSnap" },
+      { property: "og:description", content: "Upload a doctor's prescription and decode every medicine, abbreviation and instruction into clear Urdu." },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
   component: PrescriptionPage,
 });
 
