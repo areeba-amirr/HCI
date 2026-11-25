@@ -13,12 +13,17 @@ import { Route as SignupRouteImport } from './routes/signup'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedScannerRouteImport } from './routes/_authenticated/scanner'
 import { Route as AuthenticatedReportRouteImport } from './routes/_authenticated/report'
 import { Route as AuthenticatedPrescriptionRouteImport } from './routes/_authenticated/prescription'
+import { Route as AuthenticatedMedicinesRouteImport } from './routes/_authenticated/medicines'
+import { Route as AuthenticatedInteractionsRouteImport } from './routes/_authenticated/interactions'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedDiaryRouteImport } from './routes/_authenticated/diary'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
+import { Route as AuthenticatedPrescriptionsIdRouteImport } from './routes/_authenticated/prescriptions.$id'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -39,6 +44,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedScannerRoute = AuthenticatedScannerRouteImport.update({
   id: '/scanner',
   path: '/scanner',
@@ -53,6 +63,17 @@ const AuthenticatedPrescriptionRoute =
   AuthenticatedPrescriptionRouteImport.update({
     id: '/prescription',
     path: '/prescription',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedMedicinesRoute = AuthenticatedMedicinesRouteImport.update({
+  id: '/medicines',
+  path: '/medicines',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedInteractionsRoute =
+  AuthenticatedInteractionsRouteImport.update({
+    id: '/interactions',
+    path: '/interactions',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
@@ -70,28 +91,49 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPrescriptionsIdRoute =
+  AuthenticatedPrescriptionsIdRouteImport.update({
+    id: '/prescriptions/$id',
+    path: '/prescriptions/$id',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/calendar': typeof AuthenticatedCalendarRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/diary': typeof AuthenticatedDiaryRoute
   '/history': typeof AuthenticatedHistoryRoute
+  '/interactions': typeof AuthenticatedInteractionsRoute
+  '/medicines': typeof AuthenticatedMedicinesRoute
   '/prescription': typeof AuthenticatedPrescriptionRoute
   '/report': typeof AuthenticatedReportRoute
   '/scanner': typeof AuthenticatedScannerRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/prescriptions/$id': typeof AuthenticatedPrescriptionsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/calendar': typeof AuthenticatedCalendarRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/diary': typeof AuthenticatedDiaryRoute
   '/history': typeof AuthenticatedHistoryRoute
+  '/interactions': typeof AuthenticatedInteractionsRoute
+  '/medicines': typeof AuthenticatedMedicinesRoute
   '/prescription': typeof AuthenticatedPrescriptionRoute
   '/report': typeof AuthenticatedReportRoute
   '/scanner': typeof AuthenticatedScannerRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/prescriptions/$id': typeof AuthenticatedPrescriptionsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -99,12 +141,17 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/signup': typeof SignupRoute
+  '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/diary': typeof AuthenticatedDiaryRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
+  '/_authenticated/interactions': typeof AuthenticatedInteractionsRoute
+  '/_authenticated/medicines': typeof AuthenticatedMedicinesRoute
   '/_authenticated/prescription': typeof AuthenticatedPrescriptionRoute
   '/_authenticated/report': typeof AuthenticatedReportRoute
   '/_authenticated/scanner': typeof AuthenticatedScannerRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/prescriptions/$id': typeof AuthenticatedPrescriptionsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -112,35 +159,50 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/signup'
+    | '/calendar'
     | '/dashboard'
     | '/diary'
     | '/history'
+    | '/interactions'
+    | '/medicines'
     | '/prescription'
     | '/report'
     | '/scanner'
+    | '/settings'
+    | '/prescriptions/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
     | '/signup'
+    | '/calendar'
     | '/dashboard'
     | '/diary'
     | '/history'
+    | '/interactions'
+    | '/medicines'
     | '/prescription'
     | '/report'
     | '/scanner'
+    | '/settings'
+    | '/prescriptions/$id'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/login'
     | '/signup'
+    | '/_authenticated/calendar'
     | '/_authenticated/dashboard'
     | '/_authenticated/diary'
     | '/_authenticated/history'
+    | '/_authenticated/interactions'
+    | '/_authenticated/medicines'
     | '/_authenticated/prescription'
     | '/_authenticated/report'
     | '/_authenticated/scanner'
+    | '/_authenticated/settings'
+    | '/_authenticated/prescriptions/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -180,6 +242,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/scanner': {
       id: '/_authenticated/scanner'
       path: '/scanner'
@@ -199,6 +268,20 @@ declare module '@tanstack/react-router' {
       path: '/prescription'
       fullPath: '/prescription'
       preLoaderRoute: typeof AuthenticatedPrescriptionRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/medicines': {
+      id: '/_authenticated/medicines'
+      path: '/medicines'
+      fullPath: '/medicines'
+      preLoaderRoute: typeof AuthenticatedMedicinesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/interactions': {
+      id: '/_authenticated/interactions'
+      path: '/interactions'
+      fullPath: '/interactions'
+      preLoaderRoute: typeof AuthenticatedInteractionsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/history': {
@@ -222,25 +305,49 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/calendar': {
+      id: '/_authenticated/calendar'
+      path: '/calendar'
+      fullPath: '/calendar'
+      preLoaderRoute: typeof AuthenticatedCalendarRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/prescriptions/$id': {
+      id: '/_authenticated/prescriptions/$id'
+      path: '/prescriptions/$id'
+      fullPath: '/prescriptions/$id'
+      preLoaderRoute: typeof AuthenticatedPrescriptionsIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDiaryRoute: typeof AuthenticatedDiaryRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
+  AuthenticatedInteractionsRoute: typeof AuthenticatedInteractionsRoute
+  AuthenticatedMedicinesRoute: typeof AuthenticatedMedicinesRoute
   AuthenticatedPrescriptionRoute: typeof AuthenticatedPrescriptionRoute
   AuthenticatedReportRoute: typeof AuthenticatedReportRoute
   AuthenticatedScannerRoute: typeof AuthenticatedScannerRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedPrescriptionsIdRoute: typeof AuthenticatedPrescriptionsIdRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDiaryRoute: AuthenticatedDiaryRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
+  AuthenticatedInteractionsRoute: AuthenticatedInteractionsRoute,
+  AuthenticatedMedicinesRoute: AuthenticatedMedicinesRoute,
   AuthenticatedPrescriptionRoute: AuthenticatedPrescriptionRoute,
   AuthenticatedReportRoute: AuthenticatedReportRoute,
   AuthenticatedScannerRoute: AuthenticatedScannerRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedPrescriptionsIdRoute: AuthenticatedPrescriptionsIdRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

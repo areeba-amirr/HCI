@@ -14,6 +14,186 @@ export type Database = {
   }
   public: {
     Tables: {
+      medicine_name_confirmations: {
+        Row: {
+          evidence: string | null
+          action: string
+          ai_name: string | null
+          confirmed_name: string | null
+          created_at: string
+          id: string
+          scan_id: string
+          user_id: string
+        }
+        Insert: {
+          evidence?: string | null
+          action: string
+          ai_name?: string | null
+          confirmed_name?: string | null
+          created_at?: string
+          id?: string
+          scan_id: string
+          user_id: string
+        }
+        Update: {
+          evidence?: string | null
+          action?: string
+          ai_name?: string | null
+          confirmed_name?: string | null
+          created_at?: string
+          id?: string
+          scan_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medicine_name_confirmations_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      medicine_status_events: {
+        Row: {
+          id: string
+          recorded_at: string
+          scan_id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          recorded_at?: string
+          scan_id: string
+          status: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          recorded_at?: string
+          scan_id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medicine_status_events_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prescriptions: {
+        Row: {
+          created_at: string
+          doctor_name: string | null
+          extraction: Json
+          id: string
+          model: string
+          original_mime: string
+          original_path: string
+          original_sha256: string
+          original_size: number
+          page_count: number
+          quality: Json | null
+          review: Json
+          status: string
+          updated_at: string
+          uploaded_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          doctor_name?: string | null
+          extraction: Json
+          id: string
+          model: string
+          original_mime: string
+          original_path: string
+          original_sha256: string
+          original_size: number
+          page_count?: number
+          quality?: Json | null
+          review?: Json
+          status?: string
+          updated_at?: string
+          uploaded_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          doctor_name?: string | null
+          extraction?: Json
+          id?: string
+          model?: string
+          original_mime?: string
+          original_path?: string
+          original_sha256?: string
+          original_size?: number
+          page_count?: number
+          quality?: Json | null
+          review?: Json
+          status?: string
+          updated_at?: string
+          uploaded_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      prescription_reviews: {
+        Row: {
+          evidence: string | null
+          action: string
+          created_at: string
+          field: string
+          id: string
+          medicine_index: number
+          new_status: string
+          new_value: string | null
+          prescription_id: string
+          previous_value: string | null
+          user_id: string
+        }
+        Insert: {
+          evidence?: string | null
+          action: string
+          created_at?: string
+          field: string
+          id?: string
+          medicine_index: number
+          new_status: string
+          new_value?: string | null
+          prescription_id: string
+          previous_value?: string | null
+          user_id: string
+        }
+        Update: {
+          evidence?: string | null
+          action?: string
+          created_at?: string
+          field?: string
+          id?: string
+          medicine_index?: number
+          new_status?: string
+          new_value?: string | null
+          prescription_id?: string
+          previous_value?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prescription_reviews_prescription_id_fkey"
+            columns: ["prescription_id"]
+            isOneToOne: false
+            referencedRelation: "prescriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scans: {
         Row: {
           created_at: string
@@ -88,6 +268,8 @@ export type Database = {
           notes: string | null
           notes_urdu: string | null
           pain_level: number | null
+          timeline: Json | null
+          voice_transcript: string | null
           sleep_hours: number | null
           user_id: string
         }
@@ -98,6 +280,8 @@ export type Database = {
           notes?: string | null
           notes_urdu?: string | null
           pain_level?: number | null
+          timeline?: Json | null
+          voice_transcript?: string | null
           sleep_hours?: number | null
           user_id: string
         }
@@ -108,6 +292,8 @@ export type Database = {
           notes?: string | null
           notes_urdu?: string | null
           pain_level?: number | null
+          timeline?: Json | null
+          voice_transcript?: string | null
           sleep_hours?: number | null
           user_id?: string
         }

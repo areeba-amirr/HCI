@@ -1,19 +1,63 @@
+import { History as HistoryIcon } from "lucide-react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
-import { checkInteraction } from "@/lib/ai.functions";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
-import { Search, Trash2, Loader2, Pill, ShieldCheck, AlertTriangle, FileText, X, ClipboardList } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeftRight,
+  CalendarDays,
+  ClipboardList,
+  Clock,
+  FileText,
+  Info,
+  NotebookText,
+  Pill,
+  Search,
+  SearchX,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
+import { useI18n } from "@/i18n/I18nProvider";
+import { Med, MedicalDataNotice, UrduHint } from "@/components/MedicalText";
+import {
+  ConfirmDialog,
+  EmptyState,
+  MedicalField,
+  PageEnter,
+  PageHeader,
+  ProcessingCard,
+  StatusBanner,
+  isBlankValue,
+} from "@/components/app/primitives";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { ScanReviewMarker, StatusBadge } from "@/components/prescription/badges";
+import {
+  cleanUpOrphans,
+  deletePrescriptionRecord,
+  loadPrescriptionSummaries,
+} from "@/lib/prescription/store";
+import type { VerificationStatus } from "@/lib/prescription/model";
+
+type RecordInfo = { status: VerificationStatus };
+const UNDO_MS = 8000;
 
 export const Route = createFileRoute("/_authenticated/history")({
   head: () => ({
     meta: [
       { title: "Scan History — MediSnap" },
-      { name: "description", content: "Browse, search and review every medicine and prescription you have scanned with MediSnap." },
+      {
+        name: "description",
+        content:
+          "Browse, search and review every medicine and prescription you have scanned with MediSnap.",
+      },
       { property: "og:title", content: "Scan History — MediSnap" },
-      { property: "og:description", content: "Browse, search and review every medicine and prescription you have scanned with MediSnap." },
+      {
+        property: "og:description",
+        content:
+          "Browse, search and review every medicine and prescription you have scanned with MediSnap.",
+      },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -26,54 +70,95 @@ type Group =
   | { kind: "prescription"; key: string; created_at: string; items: Scan[] }
   | { kind: "label"; key: string; created_at: string; item: Scan };
 
-function isEmpty(v?: string | null) {
-  if (!v) return true;
-  const t = String(v).trim();
-  return t === "" || t.toLowerCase() === "n/a" || t === "دستیاب نہیں";
-}
+type Filter = "all" | "label" | "prescription";
+
+const FILTERS = [
+  { value: "all", label: "history.filterAll" },
+  { value: "label", label: "history.filterMedicines" },
+  { value: "prescription", label: "history.filterPrescriptions" },
+] as const;
 
 function HistoryPage() {
-  const interactionFn = useServerFn(checkInteraction);
+  const { t, tError } = useI18n();
   const [scans, setScans] = useState<Scan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [search, setSearch] = useState("");
-  const [m1, setM1] = useState(""); const [m2, setM2] = useState("");
-  const [checking, setChecking] = useState(false);
-  const [interaction, setInteraction] = useState<any>(null);
+  const [filter, setFilter] = useState<Filter>("all");
   const [viewing, setViewing] = useState<Group | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Group | null>(null);
+  // Saved prescriptions with a stored original, by scan_group_id.
+  const [records, setRecords] = useState<Map<string, RecordInfo>>(new Map());
+  // Originals are removed only once the undo window has passed.
+  const finalise = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   async function load() {
     setLoading(true);
-    const { data, error } = await supabase.from("scans").select("*").order("created_at", { ascending: false });
-    if (error) toast.error(error.message);
-    setScans(data || []); setLoading(false);
+    const { data, error } = await supabase
+      .from("scans")
+      .select("*")
+      .order("created_at", { ascending: false });
+    setLoadFailed(Boolean(error));
+    setScans(data || []);
+    setLoading(false);
+    if (error) return;
+    const groupIds = new Set(
+      (data || []).filter((s) => s.scan_group_id).map((s) => s.scan_group_id as string),
+    );
+    // Best effort: older records simply have no stored original.
+    loadPrescriptionSummaries([...groupIds]).then(
+      (m) =>
+        setRecords(
+          new Map([...m].map(([id, r]) => [id, { status: r.status as VerificationStatus }])),
+        ),
+      () => setRecords(new Map()),
+    );
+    cleanUpOrphans(groupIds).catch(() => {});
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
-  async function delScan(id: string) {
-    if (!confirm("Are you sure? This cannot be undone")) return;
-    const { error } = await supabase.from("scans").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    setScans((s) => s.filter((x) => x.id !== id));
-    toast.success("Deleted");
+  // Deleting can be undone from the toast: the removed rows are written back unchanged.
+  async function undoDelete(rows: Scan[]) {
+    const groupId = rows[0]?.scan_group_id as string | undefined;
+    if (groupId && finalise.current.has(groupId)) {
+      clearTimeout(finalise.current.get(groupId));
+      finalise.current.delete(groupId);
+    }
+    const { error } = await supabase.from("scans").insert(rows);
+    if (error) return toast.error(tError(error.message));
+    setScans((s) =>
+      [...rows, ...s].sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at)),
+    );
+    toast.success(t("history.restored"));
   }
 
-  async function delGroup(groupId: string) {
-    if (!confirm("Are you sure? This cannot be undone")) return;
-    const { error } = await supabase.from("scans").delete().eq("scan_group_id", groupId);
-    if (error) return toast.error(error.message);
-    setScans((s) => s.filter((x) => x.scan_group_id !== groupId));
-    toast.success("Deleted");
-  }
-
-  async function runInteraction() {
-    if (!m1 || !m2) return toast.error("Pick two medicines");
-    setChecking(true); setInteraction(null);
-    try {
-      const r = await interactionFn({ data: { medicine1: m1, medicine2: m2 } });
-      setInteraction(r);
-    } catch (e: any) { toast.error(e.message); }
-    finally { setChecking(false); }
+  async function confirmDelete() {
+    const group = pendingDelete;
+    if (!group) return;
+    const rows: Scan[] = group.kind === "prescription" ? group.items : [group.item];
+    const query = supabase.from("scans").delete();
+    const { error } = await (group.kind === "prescription"
+      ? query.eq("scan_group_id", group.key)
+      : query.eq("id", group.item.id));
+    if (error) return toast.error(tError(error.message));
+    const ids = new Set(rows.map((r) => r.id));
+    setScans((s) => s.filter((x) => !ids.has(x.id)));
+    if (group.kind === "prescription" && records.has(group.key)) {
+      const key = group.key;
+      finalise.current.set(
+        key,
+        setTimeout(() => {
+          finalise.current.delete(key);
+          deletePrescriptionRecord(key).catch(() => {}); // retried by the orphan check later
+        }, UNDO_MS + 1000),
+      );
+    }
+    toast.success(t("history.deleted"), {
+      duration: UNDO_MS,
+      action: { label: t("history.undo"), onClick: () => undoDelete(rows) },
+    });
   }
 
   const groups = useMemo<Group[]>(() => {
@@ -95,214 +180,394 @@ function HistoryPage() {
     return out.sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
   }, [scans]);
 
+  const counts = useMemo(() => {
+    const prescriptions = groups.filter((g) => g.kind === "prescription");
+    return {
+      all: groups.length,
+      label: groups.length - prescriptions.length,
+      prescription: prescriptions.length,
+      needsReview: prescriptions.filter(
+        (g) => records.get(g.key)?.status === "NEEDS_PROFESSIONAL_REVIEW",
+      ).length,
+    };
+  }, [groups, records]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return groups;
     return groups.filter((g) => {
+      if (filter !== "all" && g.kind !== filter) return false;
+      if (!q) return true;
       if (g.kind === "label") return (g.item.medicine_name || "").toLowerCase().includes(q);
       return g.items.some((m) => (m.medicine_name || "").toLowerCase().includes(q));
     });
-  }, [groups, search]);
-
-  const medOptions = Array.from(new Set(scans.map((s) => s.medicine_name).filter(Boolean)));
+  }, [groups, search, filter]);
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <h1 className="text-2xl font-bold md:text-3xl">Scan History</h1>
-      <p className="mt-1 text-muted-foreground">All your saved medicines and prescriptions.</p>
-
-      <div className="mt-6 rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <h2 className="font-semibold">Drug interaction checker</h2>
-        <p className="text-sm text-muted-foreground">Check whether two medicines are safe to take together.</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-          <select value={m1} onChange={(e) => setM1(e.target.value)} className="rounded-lg border border-input bg-background p-2.5 text-sm">
-            <option value="">Medicine 1…</option>
-            {medOptions.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
-          <select value={m2} onChange={(e) => setM2(e.target.value)} className="rounded-lg border border-input bg-background p-2.5 text-sm">
-            <option value="">Medicine 2…</option>
-            {medOptions.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
-          <button disabled={checking} onClick={runInteraction}
-            className="flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60">
-            {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : "Check"}
-          </button>
-        </div>
-        {interaction && (
-          <div className={`mt-4 rounded-xl border-l-4 p-4 ${
-            interaction.is_safe ? "border-success bg-success/10" : "border-destructive bg-destructive/10"
-          }`}>
-            <div className="flex items-center gap-2 font-semibold">
-              {interaction.is_safe ? <ShieldCheck className="h-5 w-5 text-success" /> : <AlertTriangle className="h-5 w-5 text-destructive" />}
-              {interaction.is_safe ? "Safe combination" : `Caution — ${interaction.severity}`}
-            </div>
-            <p className="mt-2 text-sm">{interaction.explanation}</p>
-            {interaction.explanation_urdu && <p className="urdu mt-1 text-sm">{interaction.explanation_urdu}</p>}
-          </div>
-        )}
-      </div>
-
-      <div className="mt-6 relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search medicine name…"
-          className="w-full rounded-lg border border-input bg-card py-2.5 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
-      </div>
-
-      {loading ? (
-        <div className="mt-8 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-      ) : filtered.length === 0 ? (
-        <div className="mt-8 rounded-2xl border border-dashed border-border bg-card p-10 text-center">
-          <div className="text-5xl">📋</div>
-          <p className="mt-3 text-lg font-semibold">No scans yet</p>
-          <p className="urdu mt-1 text-base text-muted-foreground">ابھی تک کوئی اسکین نہیں</p>
-          <Link to="/scanner" className="mt-5 inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground hover:opacity-90">
-            <Pill className="h-4 w-4" /> Scan Your First Medicine
+    <PageEnter className="mx-auto w-full max-w-7xl space-y-6">
+      <PageHeader
+        guide="history"
+        icon={HistoryIcon}
+        title={t("history.title")}
+        description={t("history.subtitle")}
+        actions={
+          <Link to="/interactions" className={buttonVariants({ variant: "outline" })}>
+            <ArrowLeftRight aria-hidden="true" /> {t("nav.interactions")}
           </Link>
-        </div>
-      ) : (
-        <div className="mt-6 space-y-4">
-          {filtered.map((g) =>
-            g.kind === "prescription" ? (
-              <PrescriptionCard key={g.key} group={g} onView={() => setViewing(g)} onDelete={() => delGroup(g.key)} />
-            ) : (
-              <LabelCard key={g.key} item={g.item} onView={() => setViewing(g)} onDelete={() => delScan(g.item.id)} />
-            )
-          )}
-        </div>
+        }
+      />
+
+      {loadFailed && (
+        <StatusBanner
+          tone="danger"
+          title={t("common.loadFailedTitle")}
+          action={
+            <Button variant="outline" size="sm" onClick={load}>
+              {t("root.tryAgain")}
+            </Button>
+          }
+        >
+          {t("common.loadFailedBody")}
+        </StatusBanner>
       )}
 
-      {viewing && <ViewModal group={viewing} onClose={() => setViewing(null)} />}
-    </div>
+      {loading ? (
+        <ProcessingCard title={t("common.loading")} />
+      ) : groups.length === 0 && !loadFailed ? (
+        <EmptyState
+          data-tour="history-page-empty"
+          icon={ClipboardList}
+          title={t("history.empty")}
+          body={<UrduHint>ابھی تک کوئی اسکین نہیں</UrduHint>}
+          action={
+            <Link to="/scanner" className={buttonVariants()}>
+              <Pill aria-hidden="true" /> {t("history.scanFirst")}
+            </Link>
+          }
+        />
+      ) : groups.length > 0 ? (
+        // Records take the wide column; search, filters and a summary of the real records
+        // sit beside them on wide screens and above them on narrower ones. The filters come
+        // first in the page order so keyboard and screen-reader users reach them first.
+        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_19rem]">
+          <aside
+            aria-label={t("history.toolsLabel")}
+            className="space-y-4 xl:sticky xl:top-6 xl:col-start-2 xl:row-start-1"
+          >
+            <div className="panel space-y-4" data-tour="hist-tools">
+              <div className="relative">
+                <Search
+                  className="pointer-events-none absolute start-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <Input
+                  type="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  aria-label={t("history.search")}
+                  dir="auto"
+                  placeholder={t("history.search")}
+                  className="ps-11"
+                />
+              </div>
+              <div
+                role="group"
+                aria-label={t("history.filterLabel")}
+                className="flex flex-wrap gap-2 xl:flex-col"
+              >
+                {FILTERS.map(({ value, label }) => (
+                  <Button
+                    key={value}
+                    variant={filter === value ? "default" : "outline"}
+                    aria-pressed={filter === value}
+                    onClick={() => setFilter(value)}
+                    className="xl:w-full xl:justify-between"
+                  >
+                    {t(label)}
+                    <span className="tabular-nums opacity-80">{counts[value]}</span>
+                  </Button>
+                ))}
+              </div>
+              <p role="status" className="text-[0.9375rem] text-muted-foreground">
+                {t("history.resultCount", { shown: filtered.length, total: groups.length })}
+              </p>
+            </div>
+            {counts.needsReview > 0 && (
+              <StatusBanner
+                tone="warning"
+                title={t("history.needsReviewTitle", { count: counts.needsReview })}
+              >
+                {t("history.needsReviewBody")}
+              </StatusBanner>
+            )}
+          </aside>
+
+          <div data-tour="history-page" className="min-w-0 space-y-4 xl:col-start-1 xl:row-start-1">
+            <MedicalDataNotice />
+            {filtered.length === 0 ? (
+              <EmptyState
+                icon={SearchX}
+                title={t("history.noMatchTitle")}
+                body={t("history.noMatchBody")}
+                action={
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSearch("");
+                      setFilter("all");
+                    }}
+                  >
+                    {t("history.clearFilters")}
+                  </Button>
+                }
+              />
+            ) : (
+              <ul className="space-y-4">
+                {filtered.map((g, i) => (
+                  <li key={g.key} data-tour={i === 0 ? "hist-item" : undefined}>
+                    <GroupCard
+                      group={g}
+                      record={g.kind === "prescription" ? records.get(g.key) : undefined}
+                      onView={() => setViewing(g)}
+                      onDelete={() => setPendingDelete(g)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      <ViewDialog group={viewing} onClose={() => setViewing(null)} />
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        title={t("history.deleteTitle")}
+        body={t("history.deleteBody")}
+        confirmLabel={t("history.delete")}
+        cancelLabel={t("common.cancel")}
+        destructive
+        onConfirm={confirmDelete}
+      />
+    </PageEnter>
   );
 }
 
-function PrescriptionCard({ group, onView, onDelete }: { group: Extract<Group, { kind: "prescription" }>; onView: () => void; onDelete: () => void }) {
+function GroupCard({
+  group,
+  record,
+  onView,
+  onDelete,
+}: {
+  group: Group;
+  record?: RecordInfo;
+  onView: () => void;
+  onDelete: () => void;
+}) {
+  const { t, formatDateTime } = useI18n();
+  const isPrescription = group.kind === "prescription";
+  const items: Scan[] = group.kind === "prescription" ? group.items : [group.item];
+  const flagged = items.some((m) => m.is_dangerous);
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <article className="panel flex h-full flex-col">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="flex items-center gap-2 text-sm font-semibold text-primary"><ClipboardList className="h-4 w-4" /> Prescription Scan</p>
-          <p className="mt-1 text-xs text-muted-foreground">📅 {format(new Date(group.created_at), "PPP — p")}</p>
-          <p className="mt-1 text-sm font-medium">💊 {group.items.length} medicine{group.items.length === 1 ? "" : "s"} found</p>
-        </div>
+        <p className="flex items-center gap-2 text-sm font-semibold text-primary">
+          {isPrescription ? (
+            <ClipboardList className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <Pill className="h-4 w-4" aria-hidden="true" />
+          )}
+          {isPrescription ? t("history.prescriptionScan") : t("history.labelScan")}
+        </p>
+        {flagged && (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-destructive px-2.5 py-0.5 text-sm font-semibold text-destructive-foreground">
+            <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" /> {t("prescription.caution")}
+          </span>
+        )}
       </div>
-      <ol className="mt-4 space-y-2">
-        {group.items.map((m, i) => (
-          <li key={m.id} className="rounded-lg border border-border bg-secondary/40 p-3">
+      <p className="mt-1 text-sm text-muted-foreground">
+        {formatDateTime(new Date(group.created_at))}
+      </p>
+      {record && (
+        <div className="mt-2">
+          <StatusBadge status={record.status} />
+        </div>
+      )}
+      {isPrescription && !record && (
+        <p className="mt-2 text-sm text-muted-foreground">{t("rx.history.noOriginal")}</p>
+      )}
+      {isPrescription && (
+        <p className="mt-2 font-medium">
+          {t(items.length === 1 ? "history.medicineOne" : "history.medicineMany", {
+            count: items.length,
+          })}
+        </p>
+      )}
+      <ol className={`mt-3 grid flex-1 gap-2 ${items.length > 1 ? "md:grid-cols-2" : ""}`}>
+        {items.map((m, i) => (
+          <li key={m.id ?? i} className="rounded-2xl bg-secondary p-3">
             <p className="font-semibold">
-              <span className="text-primary">{i + 1}.</span> {m.medicine_name || "Unnamed"}
-              {!isEmpty(m.medicine_name_urdu) && <span className="urdu"> — {m.medicine_name_urdu}</span>}
+              {isPrescription && <span className="text-primary">{i + 1}. </span>}
+              {m.medicine_name ? <Med>{m.medicine_name}</Med> : t("history.unnamed")}
+              {!isBlankValue(m.medicine_name_urdu) && (
+                <span className="urdu"> {m.medicine_name_urdu}</span>
+              )}
             </p>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {!isEmpty(m.dosage) && <span>{m.dosage}</span>}
-              {!isEmpty(m.dosage) && !isEmpty(m.frequency) && " — "}
-              {!isEmpty(m.frequency) && <span>{m.frequency}</span>}
-              {!isEmpty(m.frequency_urdu) && <span className="urdu"> ({m.frequency_urdu})</span>}
+            <p className="mt-0.5 text-[0.9375rem] text-muted-foreground">
+              {!isBlankValue(m.dosage) && <Med>{m.dosage}</Med>}
+              {!isBlankValue(m.dosage) && !isBlankValue(m.frequency) && ", "}
+              {!isBlankValue(m.frequency) && <Med>{m.frequency}</Med>}
             </p>
+            <ScanReviewMarker scan={m} />
           </li>
         ))}
       </ol>
-      <div className="mt-4 flex flex-wrap justify-end gap-2">
-        <button onClick={onView} className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent">View Full</button>
-        <button onClick={onDelete} className="flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10">
-          <Trash2 className="h-4 w-4" /> Delete
-        </button>
+      <div className="mt-4 flex flex-wrap justify-between gap-2">
+        <div className="flex flex-wrap gap-2">
+          {record && (
+            <Link to="/prescriptions/$id" params={{ id: group.key }} className={buttonVariants()}>
+              <FileText aria-hidden="true" /> {t("rx.openPrescription")}
+            </Link>
+          )}
+          {isPrescription && (
+            <Link
+              to="/medicines"
+              hash={record ? `rx-${group.key}` : undefined}
+              className={buttonVariants({ variant: "outline" })}
+            >
+              <Pill aria-hidden="true" /> {t("nav.medicines")}
+            </Link>
+          )}
+          <Button variant="outline" onClick={onView}>
+            {t("history.viewFull")}
+          </Button>
+        </div>
+        <Button
+          variant="ghost"
+          className="text-destructive hover:bg-destructive/8 hover:text-destructive"
+          onClick={onDelete}
+        >
+          <Trash2 aria-hidden="true" /> {t("history.delete")}
+        </Button>
       </div>
-    </div>
+    </article>
   );
 }
 
-function LabelCard({ item, onView, onDelete }: { item: Scan; onView: () => void; onDelete: () => void }) {
-  return (
-    <div className={`rounded-2xl border bg-card p-5 shadow-sm ${item.is_dangerous ? "border-destructive" : "border-border"}`}>
-      <p className="flex items-center gap-2 text-sm font-semibold text-primary"><Pill className="h-4 w-4" /> Medicine Label Scan</p>
-      <p className="mt-1 text-xs text-muted-foreground">📅 {format(new Date(item.created_at), "PPP — p")}</p>
-      <div className="mt-3">
-        <p className="text-lg font-bold">
-          {item.medicine_name || "Unnamed"}
-          {!isEmpty(item.medicine_name_urdu) && <span className="urdu"> — {item.medicine_name_urdu}</span>}
-        </p>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          {!isEmpty(item.dosage) && <span>{item.dosage}</span>}
-          {!isEmpty(item.dosage) && !isEmpty(item.frequency) && " — "}
-          {!isEmpty(item.frequency) && <span>{item.frequency}</span>}
-          {!isEmpty(item.frequency_urdu) && <span className="urdu"> ({item.frequency_urdu})</span>}
-        </p>
-      </div>
-      <div className="mt-4 flex flex-wrap justify-end gap-2">
-        <button onClick={onView} className="rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium hover:bg-accent">View Full</button>
-        <button onClick={onDelete} className="flex items-center gap-1.5 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2 text-sm font-medium text-destructive hover:bg-destructive/10">
-          <Trash2 className="h-4 w-4" /> Delete
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function ViewModal({ group, onClose }: { group: Group; onClose: () => void }) {
-  const items = group.kind === "prescription" ? group.items : [group.item];
-  const isPrescription = group.kind === "prescription";
+function ViewDialog({ group, onClose }: { group: Group | null; onClose: () => void }) {
+  const { t, formatDateTime } = useI18n();
+  const items: Scan[] = !group ? [] : group.kind === "prescription" ? group.items : [group.item];
+  const isPrescription = group?.kind === "prescription";
   const interactions = isPrescription
-    ? (items.find((i: any) => i.prescription_data?.interactions)?.prescription_data?.interactions as string | undefined)
+    ? (items.find((i) => i.prescription_data?.interactions)?.prescription_data?.interactions as
+        | string
+        | undefined)
     : undefined;
-  const doctorNotes = items.find((i: any) => !isEmpty(i.doctor_notes))?.doctor_notes;
-  const doctorNotesUrdu = items.find((i: any) => !isEmpty(i.doctor_notes_urdu))?.doctor_notes_urdu;
+  const doctorNotes = items.find((i) => !isBlankValue(i.doctor_notes))?.doctor_notes;
+  const doctorNotesUrdu = items.find((i) => !isBlankValue(i.doctor_notes_urdu))?.doctor_notes_urdu;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-card shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 flex items-center justify-between border-b border-border bg-card p-5">
-          <div>
-            <h2 className="flex items-center gap-2 text-lg font-bold">
-              {isPrescription ? <FileText className="h-5 w-5 text-primary" /> : <Pill className="h-5 w-5 text-primary" />}
-              {isPrescription ? "Prescription Details" : "Medicine Details"}
-            </h2>
-            <p className="text-xs text-muted-foreground">{format(new Date(group.created_at), "PPP — p")}</p>
-          </div>
-          <button onClick={onClose} aria-label="Close details" className="rounded-md p-2 hover:bg-accent"><X className="h-4 w-4" /></button>
-        </div>
-        <div className="space-y-4 p-5">
-          {!isEmpty(interactions) && (
-            <div className="rounded-xl border-2 border-warning bg-warning/10 p-4">
-              <p className="flex items-center gap-2 font-bold text-warning"><AlertTriangle className="h-4 w-4" /> Drug Interactions</p>
-              <p className="mt-2 text-sm">{interactions}</p>
-            </div>
+    <Dialog
+      open={Boolean(group)}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto rounded-3xl border-border bg-card">
+        <DialogTitle className="display flex items-center gap-2 pe-8 text-2xl font-normal">
+          {isPrescription ? (
+            <FileText className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+          ) : (
+            <Pill className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
           )}
-          {items.map((m: any, i: number) => (
-            <div key={m.id} className={`rounded-xl border p-4 ${m.is_dangerous ? "border-destructive" : "border-border"}`}>
-              <p className="text-lg font-bold">
-                {isPrescription && <span className="text-primary">{i + 1}. </span>}
-                {m.medicine_name}
-                {!isEmpty(m.medicine_name_urdu) && <span className="urdu"> — {m.medicine_name_urdu}</span>}
+          {isPrescription ? t("history.prescriptionDetails") : t("history.medicineDetails")}
+        </DialogTitle>
+        <DialogDescription className="text-muted-foreground">
+          {group && formatDateTime(new Date(group.created_at))}
+        </DialogDescription>
+        <div className="space-y-4">
+          <MedicalDataNotice />
+          {!isBlankValue(interactions) && (
+            <section className="panel-tint">
+              <p className="flex items-center gap-2 font-semibold">
+                <Info className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />{" "}
+                {t("history.interactions")}
               </p>
+              <p className="mt-2">
+                <Med>{interactions}</Med>
+              </p>
+            </section>
+          )}
+          {items.map((m, i) => (
+            <section
+              key={m.id ?? i}
+              className={`rounded-2xl border p-4 ${m.is_dangerous ? "border-2 border-destructive" : "border-border"}`}
+            >
+              <h3 className="text-lg font-bold">
+                {isPrescription && <span className="text-primary">{i + 1}. </span>}
+                <Med>{m.medicine_name}</Med>
+              </h3>
+              {!isBlankValue(m.medicine_name_urdu) && (
+                <p className="urdu">{m.medicine_name_urdu}</p>
+              )}
+              <ScanReviewMarker scan={m} />
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <Field label="💊 Dosage" en={m.dosage} ur={m.dosage_urdu} />
-                <Field label="⏰ Frequency" en={m.frequency} ur={m.frequency_urdu} />
-                <Field label="🍽️ Instructions" en={m.food_interactions} ur={m.food_interactions_urdu} />
-                <Field label="⚠️ Warnings" en={m.warnings} ur={m.warnings_urdu} danger />
+                <MedicalField
+                  icon={Pill}
+                  label={t("scan.dosage")}
+                  en={m.dosage}
+                  ur={m.dosage_urdu}
+                />
+                <MedicalField
+                  icon={Clock}
+                  label={t("scan.frequency")}
+                  en={m.frequency}
+                  ur={m.frequency_urdu}
+                />
+                {!isBlankValue(m.prescription_data?.duration) && (
+                  <MedicalField
+                    icon={CalendarDays}
+                    label={t("scan.duration")}
+                    en={m.prescription_data.duration}
+                    ur={m.prescription_data.duration_urdu}
+                  />
+                )}
+                <MedicalField
+                  icon={NotebookText}
+                  label={t("scan.instructions")}
+                  en={m.food_interactions}
+                  ur={m.food_interactions_urdu}
+                />
+                {!(
+                  isBlankValue(m.warnings) &&
+                  m.prescription_data?.source === "prescription_safety_v1"
+                ) && (
+                  <div className="sm:col-span-2">
+                    <MedicalField
+                      icon={AlertTriangle}
+                      label={t("scan.warnings")}
+                      en={m.warnings}
+                      ur={m.warnings_urdu}
+                      emphasis
+                    />
+                  </div>
+                )}
               </div>
-            </div>
+            </section>
           ))}
-          {!isEmpty(doctorNotes) && (
-            <div className="rounded-xl border border-border bg-secondary/40 p-4">
-              <p className="font-semibold">Doctor's Notes</p>
-              <p className="mt-2 text-sm">{doctorNotes}</p>
-              {!isEmpty(doctorNotesUrdu) && <p className="urdu mt-1 text-sm">{doctorNotesUrdu}</p>}
-            </div>
+          {!isBlankValue(doctorNotes) && (
+            <section className="panel-tint">
+              <p className="font-semibold">{t("history.doctorNotes")}</p>
+              <p className="mt-2">
+                <Med>{doctorNotes}</Med>
+              </p>
+              {!isBlankValue(doctorNotesUrdu) && <p className="urdu mt-1">{doctorNotesUrdu}</p>}
+            </section>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, en, ur, danger }: { label: string; en?: string; ur?: string; danger?: boolean }) {
-  if (isEmpty(en) && isEmpty(ur)) return null;
-  return (
-    <div>
-      <p className={`text-xs font-semibold uppercase tracking-wide ${danger ? "text-destructive" : "text-muted-foreground"}`}>{label}</p>
-      {!isEmpty(en) && <p className={`mt-1 text-sm ${danger ? "text-destructive" : ""}`}>{en}</p>}
-      {!isEmpty(ur) && <p className={`urdu text-sm ${danger ? "text-destructive" : ""}`}>{ur}</p>}
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

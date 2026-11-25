@@ -2,7 +2,13 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Pill, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { useI18n } from "@/i18n/I18nProvider";
+import { AuthFrame } from "@/components/app/AuthFrame";
+import { StatusBanner } from "@/components/app/primitives";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { en } from "@/i18n/messages";
 
 export const Route = createFileRoute("/signup")({
   component: SignupPage,
@@ -21,12 +27,14 @@ export const Route = createFileRoute("/signup")({
 
 function SignupPage() {
   const navigate = useNavigate();
+  const { t, tError } = useI18n();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -39,11 +47,11 @@ function SignupPage() {
     setError(null);
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(en["auth.passwordMismatch"]);
       return;
     }
     if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+      setError(en["auth.passwordShort"]);
       return;
     }
 
@@ -67,53 +75,75 @@ function SignupPage() {
   }
 
   return (
-    <div className="grid min-h-screen place-items-center bg-secondary/40 px-4 py-8">
-      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm">
-        <Link to="/" className="mb-6 flex items-center gap-2">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground"><Pill className="h-5 w-5" /></div>
-          <span className="text-lg font-bold">MediSnap</span>
-        </Link>
-        <h1 className="text-2xl font-bold">Create your account</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Start understanding your medicines today.</p>
-
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">Full name</label>
-            <input type="text" required value={fullName} onChange={(e) => setFullName(e.target.value)}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+    <AuthFrame
+      title={t("auth.createTitle")}
+      subtitle={t("auth.createSubtitle")}
+      footer={
+        <>
+          {t("auth.haveAccount")}{" "}
+          <Link to="/login" className="font-semibold text-primary underline-offset-4 hover:underline">
+            {t("auth.login")}
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="name" className="field-label">{t("auth.fullName")}</label>
+          <Input id="name" type="text" autoComplete="name" dir="auto" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
+        </div>
+        <div>
+          <label htmlFor="email" className="field-label">{t("auth.email")}</label>
+          <Input id="email" type="email" dir="ltr" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        </div>
+        <div>
+          <label htmlFor="password" className="field-label">{t("auth.password")}</label>
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              dir="ltr"
+              autoComplete="new-password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="pe-12"
+              aria-describedby="password-hint"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowPassword((s) => !s)}
+              aria-pressed={showPassword}
+              aria-label={showPassword ? t("auth.hidePassword") : t("auth.showPassword")}
+              className="absolute end-0.5 top-0.5"
+            >
+              {showPassword ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+            </Button>
           </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">Email</label>
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">Password</label>
-            <input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium">Confirm password</label>
-            <input type="password" required minLength={6} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
-          </div>
-
-          {error && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error}
-            </div>
-          )}
-
-          <button disabled={loading} type="submit"
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60">
-            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-            Create Account
-          </button>
-        </form>
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          Already have an account? <Link to="/login" className="font-medium text-primary hover:underline">Login</Link>
-        </p>
-      </div>
-    </div>
+          <p id="password-hint" className="mt-1.5 text-sm text-muted-foreground">{t("auth.passwordShort")}</p>
+        </div>
+        <div>
+          <label htmlFor="confirm" className="field-label">{t("auth.confirmPassword")}</label>
+          <Input
+            id="confirm"
+            type={showPassword ? "text" : "password"}
+            dir="ltr"
+            autoComplete="new-password"
+            required
+            minLength={6}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
+        </div>
+        {error && <StatusBanner tone="danger">{tError(error)}</StatusBanner>}
+        <Button size="lg" disabled={loading} type="submit" className="w-full">
+          {loading && <Loader2 className="animate-spin" aria-hidden="true" />}
+          {t("auth.createButton")}
+        </Button>
+      </form>
+    </AuthFrame>
   );
 }

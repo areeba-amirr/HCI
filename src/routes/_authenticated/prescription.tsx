@@ -1,284 +1,487 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { scanPrescription } from "@/lib/ai.functions";
-import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Upload, Save, RefreshCcw, FileText, AlertTriangle } from "lucide-react";
+import { CheckCircle2, FileText, Loader2, Pill, RefreshCcw, Save, ScanSearch } from "lucide-react";
 import { toast } from "sonner";
+import { scanPrescription } from "@/lib/ai.functions";
+import { useI18n } from "@/i18n/I18nProvider";
+import type { MessageKey } from "@/i18n/messages";
+import { UrduHint } from "@/components/MedicalText";
+import {
+  ConfirmDialog,
+  FlowSteps,
+  PageEnter,
+  PageHeader,
+  ProcessingCard,
+  StatusBanner,
+} from "@/components/app/primitives";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { PrescriptionUpload } from "@/components/prescription/PrescriptionUpload";
+import { OriginalViewer } from "@/components/prescription/OriginalViewer";
+import { AI_ISSUE_KEY } from "@/components/prescription/ReviewPanel";
+import { SavedPrescriptionList } from "@/components/prescription/SavedPrescriptionList";
+import { ReadAloud } from "@/components/ReadAloud";
+import type { PreparedPrescription, QualityIssue } from "@/lib/prescription/files";
+import type { PrescriptionExtraction } from "@/lib/prescription/model";
+import {
+  SaveError,
+  discardPartialSave,
+  isPartiallySaved,
+  newSaveProgress,
+  savePrescription,
+  type SaveFailure,
+  type SaveProgress,
+  type SaveStage,
+} from "@/lib/prescription/store";
 
 export const Route = createFileRoute("/_authenticated/prescription")({
   head: () => ({
     meta: [
       { title: "Prescription Reader — MediSnap" },
-      { name: "description", content: "Upload a doctor's prescription and decode every medicine, abbreviation and instruction into clear Urdu." },
+      {
+        name: "description",
+        content:
+          "Upload a doctor's prescription and keep the original exactly as uploaded, ready to view, download or attach to a doctor report.",
+      },
       { property: "og:title", content: "Prescription Reader — MediSnap" },
-      { property: "og:description", content: "Upload a doctor's prescription and decode every medicine, abbreviation and instruction into clear Urdu." },
+      {
+        property: "og:description",
+        content:
+          "Upload a doctor's prescription and keep the original exactly as uploaded, ready to view, download or attach to a doctor report.",
+      },
       { name: "robots", content: "noindex" },
     ],
   }),
   component: PrescriptionPage,
 });
 
-interface PMed {
-  name?: string; name_urdu?: string;
-  dosage?: string; dosage_urdu?: string;
-  frequency?: string; frequency_urdu?: string;
-  duration?: string; duration_urdu?: string;
-  instructions?: string; instructions_urdu?: string;
-  warnings?: string; warnings_urdu?: string;
-  is_dangerous?: boolean;
-}
+const QUALITY_KEY: Record<QualityIssue, MessageKey> = {
+  low_resolution: "rx.quality.low_resolution",
+  blurry: "rx.quality.blurry",
+  too_dark: "rx.quality.too_dark",
+  too_bright: "rx.quality.too_bright",
+  low_contrast: "rx.quality.low_contrast",
+};
 
-interface PResult {
-  medicines: PMed[];
-  doctor_notes?: string; doctor_notes_urdu?: string;
-  interactions?: string; interactions_urdu?: string;
-}
+// Which step failed (title) and why (body), so the message says what actually happened.
+const SAVE_STAGE_KEY: Record<SaveError["stage"], MessageKey> = {
+  auth: "rx.save.failed.auth",
+  upload: "rx.save.failed.upload",
+  record: "rx.save.failed.record",
+  medicines: "rx.save.failed.medicines",
+  review: "rx.save.failed.review",
+};
+const SAVE_REASON_KEY: Record<SaveFailure, MessageKey> = {
+  not_set_up: "rx.save.reason.notSetUp",
+  permission: "rx.save.reason.permission",
+  session: "rx.save.reason.session",
+  network: "rx.save.reason.network",
+  too_large: "rx.save.reason.tooLarge",
+  file_type: "rx.save.reason.fileType",
+  unknown: "rx.save.reason.unknown",
+};
+const STAGE_PROGRESS_KEY: Record<SaveStage, MessageKey> = {
+  upload: "rx.save.stage.upload",
+  record: "rx.save.stage.record",
+  medicines: "rx.save.stage.medicines",
+  review: "rx.save.stage.review",
+};
 
-function isEmpty(v?: string) {
-  if (!v) return true;
-  const t = v.trim();
-  return t === "" || t === "N/A" || t === "دستیاب نہیں";
+type SaveState = "idle" | "uploading" | "saving" | "saved" | "failed";
+
+interface ReadResult {
+  extraction: PrescriptionExtraction;
+  model: string;
 }
 
 function PrescriptionPage() {
-  const fn = useServerFn(scanPrescription);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const read = useServerFn(scanPrescription);
+  const { t, tError } = useI18n();
+  const [prepared, setPrepared] = useState<PreparedPrescription | null>(null);
+  const [acknowledged, setAcknowledged] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [result, setResult] = useState<PResult | null>(null);
-  const [dragOver, setDragOver] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<ReadResult | null>(null);
+  const [doctorName, setDoctorName] = useState("");
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveStage, setSaveStage] = useState<SaveStage | null>(null);
+  const [saveError, setSaveError] = useState<{
+    stage: SaveError["stage"];
+    reason: SaveFailure;
+  } | null>(null);
+  // What this result has already written, so a retry continues instead of duplicating.
+  const progress = useRef<SaveProgress | null>(null);
+  const inFlight = useRef(false);
+  const saving = saveState === "uploading" || saveState === "saving";
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
 
-  function readFile(file: File) {
-    if (!file.type.startsWith("image/")) { toast.error("Please choose an image file"); return; }
-    const reader = new FileReader();
-    reader.onload = () => { setPreview(reader.result as string); setResult(null); setSaved(false); };
-    reader.readAsDataURL(file);
-  }
+  const issues =
+    prepared?.quality.flatMap((q) => q.issues.map((issue) => ({ page: q.page, issue }))) ?? [];
+  const canRead = Boolean(prepared) && (issues.length === 0 || acknowledged);
 
-  function onDrop(e: React.DragEvent) {
-    e.preventDefault(); setDragOver(false);
-    const f = e.dataTransfer.files?.[0]; if (f) readFile(f);
-  }
-
-  async function scan() {
-    if (!preview) return;
-    setLoading(true); setResult(null); setSaved(false);
+  async function runRead() {
+    if (!prepared || !canRead) return;
+    await abandonPartialSave();
+    setLoading(true);
+    setError(null);
+    setResult(null);
     try {
-      const data = await fn({ data: { imageBase64: preview } });
-      setResult(data as PResult);
-    } catch (e: any) {
-      toast.error(e.message || "Failed to read prescription");
-    } finally { setLoading(false); }
+      const data = await read({ data: { pages: prepared.pages.map((p) => p.dataUrl) } });
+      setResult(data as ReadResult);
+    } catch (e) {
+      setError(e instanceof Error && e.message ? tError(e.message) : t("prescription.failed"));
+    } finally {
+      setLoading(false);
+    }
   }
 
-  async function saveAll() {
-    if (!result || !result.medicines?.length) return;
-    setSaving(true);
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) { setSaving(false); return; }
-    const groupId = (typeof crypto !== "undefined" && "randomUUID" in crypto)
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const rows = result.medicines.map((m) => ({
-      user_id: u.user!.id,
-      scan_type: "prescription",
-      scan_group_id: groupId,
-      medicine_name: m.name,
-      medicine_name_urdu: m.name_urdu,
-      dosage: m.dosage,
-      dosage_urdu: m.dosage_urdu,
-      frequency: m.frequency,
-      frequency_urdu: m.frequency_urdu,
-      warnings: m.warnings,
-      warnings_urdu: m.warnings_urdu,
-      food_interactions: m.instructions,
-      food_interactions_urdu: m.instructions_urdu,
-      doctor_notes: result.doctor_notes,
-      doctor_notes_urdu: result.doctor_notes_urdu,
-      is_dangerous: !!m.is_dangerous,
-      prescription_data: { ...m, interactions: result.interactions } as any,
-    }));
-    const { error } = await supabase.from("scans").insert(rows);
-    setSaving(false);
-    if (error) toast.error(error.message);
-    else { setSaved(true); toast.success("✅ All medicines saved!"); }
+  async function save() {
+    if (!prepared || !result || inFlight.current) return; // one save at a time, never twice
+    inFlight.current = true;
+    progress.current ??= newSaveProgress();
+    setSaveError(null);
+    setSaveState(progress.current.uploaded ? "saving" : "uploading");
+    try {
+      const { id } = await savePrescription(
+        // The AI reading is stored apart from the original and starts unchecked: the person
+        // checks it in My Medicines, never here.
+        {
+          prepared,
+          extraction: result.extraction,
+          model: result.model,
+          review: {},
+          log: [],
+          doctorName,
+        },
+        progress.current,
+        (stage) => {
+          setSaveStage(stage);
+          setSaveState(stage === "upload" ? "uploading" : "saving");
+        },
+      );
+      setSavedId(id);
+      setSaveState("saved");
+      toast.success(t("rx.save.done"));
+    } catch (e) {
+      const err = e instanceof SaveError ? e : new SaveError("record", "unknown");
+      if (!(e instanceof SaveError)) console.error("[prescription save] unexpected", e);
+      setSaveError({ stage: err.stage, reason: err.reason });
+      setSaveState("failed");
+    } finally {
+      inFlight.current = false;
+      setSaveStage(null);
+    }
+  }
+
+  /** Removes anything a failed save left behind, when the result is discarded. */
+  async function abandonPartialSave() {
+    const p = progress.current;
+    progress.current = null;
+    if (p && isPartiallySaved(p)) await discardPartialSave(p).catch(() => {});
   }
 
   function reset() {
-    setPreview(null); setResult(null); setSaved(false);
-    if (fileRef.current) fileRef.current.value = "";
+    if (!savedId) void abandonPartialSave();
+    else progress.current = null;
+    setSaveState("idle");
+    setPrepared(null);
+    setAcknowledged(false);
+    setResult(null);
+    setDoctorName("");
+    setError(null);
+    setSaveError(null);
+    setSavedId(null);
   }
 
+  const partial = progress.current && isPartiallySaved(progress.current);
+
+  const step = savedId ? 3 : result ? 2 : prepared ? 1 : 0;
+  const wide =
+    Boolean(prepared) &&
+    !loading &&
+    !(
+      result &&
+      (!result.extraction.image_quality.usable || result.extraction.medicines.length === 0)
+    );
+  const usable = result?.extraction.image_quality.usable ?? false;
+  const medicines = result?.extraction.medicines ?? [];
+
   return (
-    <div className="mx-auto max-w-3xl">
-      <h1 className="text-2xl font-bold md:text-3xl">Scan Doctor Prescription</h1>
-      <p className="urdu mt-1 text-lg text-muted-foreground">ڈاکٹر کا نسخہ اسکین کریں</p>
+    <PageEnter
+      className={`@container mx-auto w-full space-y-6 ${
+        // One centred column while there is a single thing to do (upload, or retake an
+        // unreadable photo); the wide two-column layout only when the original sits beside
+        // the reading.
+        wide ? "max-w-6xl" : "max-w-3xl"
+      }`}
+    >
+      <PageHeader
+        guide="prescription"
+        icon={FileText}
+        title={t("prescription.title")}
+        description={t("rx.subtitle")}
+        urdu={
+          <UrduHint className="mt-1 text-lg text-muted-foreground">
+            ڈاکٹر کا نسخہ اسکین کریں
+          </UrduHint>
+        }
+      />
+      <div data-tour="rx-steps">
+        <FlowSteps steps={[t("rx.stepAdd"), t("scan.stepRead"), t("scan.stepSave")]} current={step} />
+      </div>
 
-      {!result && (
-        <div className="mt-6">
-          <label
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={onDrop}
-            className={`flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed p-10 text-center transition-colors ${
-              dragOver ? "border-primary bg-primary/5" : "border-border bg-card hover:bg-accent/30"
-            }`}
-          >
-            {preview ? (
-              <img src={preview} alt="Uploaded prescription image preview" className="max-h-[40vh] w-auto rounded-lg object-contain" />
-            ) : (
-              <>
-                <div className="grid h-14 w-14 place-items-center rounded-full bg-primary/10 text-primary">
-                  <Upload className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="text-base font-semibold">Click to upload prescription photo</p>
-                  <p className="text-sm text-muted-foreground">Handwritten or printed accepted</p>
-                </div>
-              </>
-            )}
-            <input
-              ref={fileRef} type="file" accept="image/*" hidden
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) readFile(f); }}
+      {!prepared && (
+        <>
+          <div data-tour="prescription-page">
+            <PrescriptionUpload
+              onPrepared={(p) => {
+                setPrepared(p);
+                setAcknowledged(false);
+              }}
             />
-          </label>
+          </div>
+          <SavedPrescriptionList />
+        </>
+      )}
 
-          {preview && (
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button
-                onClick={scan} disabled={loading}
-                className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-                {loading ? "Reading prescription..." : "Read Prescription"}
-              </button>
-              <button
-                onClick={reset} disabled={loading}
-                className="flex items-center gap-2 rounded-lg border border-border bg-card px-5 py-2.5 font-medium hover:bg-accent disabled:opacity-60"
-              >
-                <RefreshCcw className="h-4 w-4" /> Choose another
-              </button>
+      {prepared && !result && !loading && (
+        <div className="grid gap-6 @3xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <OriginalViewer pages={prepared.pages} />
+          <div className="space-y-4">
+            {issues.length > 0 ? (
+              <StatusBanner tone="warning" title={t("rx.quality.title")}>
+                <ul className="list-disc space-y-1 ps-5">
+                  {issues.map(({ page, issue }) => (
+                    <li key={`${page}-${issue}`}>
+                      {prepared.pages.length > 1 && `${t("rx.original.pageN", { n: page })}: `}
+                      {t(QUALITY_KEY[issue])}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2">{t("rx.quality.advice")}</p>
+                <label className="mt-3 flex items-start gap-3 font-medium">
+                  <Checkbox
+                    checked={acknowledged}
+                    onCheckedChange={(v) => setAcknowledged(v === true)}
+                    className="mt-0.5"
+                    aria-describedby="rx-quality-ack"
+                  />
+                  <span id="rx-quality-ack">{t("rx.quality.acknowledge")}</span>
+                </label>
+              </StatusBanner>
+            ) : (
+              <StatusBanner tone="success" title={t("rx.quality.okTitle")}>
+                {t("rx.quality.okBody")}
+              </StatusBanner>
+            )}
+            <div className="flex flex-wrap gap-3">
+              <Button size="lg" onClick={runRead} disabled={!canRead}>
+                <ScanSearch aria-hidden="true" /> {t("prescription.read")}
+              </Button>
+              <Button size="lg" variant="outline" onClick={reset}>
+                <RefreshCcw aria-hidden="true" /> {t("rx.chooseAnother")}
+              </Button>
             </div>
-          )}
+            {error && (
+              <StatusBanner
+                tone="danger"
+                title={t("prescription.failed")}
+                action={
+                  <Button variant="outline" size="sm" onClick={runRead}>
+                    <RefreshCcw aria-hidden="true" /> {t("root.tryAgain")}
+                  </Button>
+                }
+              >
+                {error}
+              </StatusBanner>
+            )}
+          </div>
         </div>
       )}
 
       {loading && (
-        <div className="mt-6 space-y-2 rounded-xl border border-border bg-card p-6">
-          <div className="flex items-center gap-3">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
-            <span className="text-sm font-medium">Reading prescription...</span>
-          </div>
-          <p className="ml-8 text-sm text-muted-foreground">Decoding medical abbreviations...</p>
+        <ProcessingCard title={t("prescription.reading")} detail={t("rx.readingDetail")} />
+      )}
+
+      {result && prepared && !usable && (
+        <div className="space-y-4">
+          <StatusBanner
+            tone="danger"
+            title={t("rx.unusable.title")}
+            action={
+              <Button onClick={reset}>
+                <RefreshCcw aria-hidden="true" /> {t("rx.unusable.retake")}
+              </Button>
+            }
+          >
+            <p>{t("rx.unusable.body")}</p>
+            {result.extraction.image_quality.issues.length > 0 && (
+              <ul className="mt-2 list-disc space-y-1 ps-5">
+                {result.extraction.image_quality.issues.map((i) => (
+                  <li key={i}>{AI_ISSUE_KEY[i] ? t(AI_ISSUE_KEY[i]) : i}</li>
+                ))}
+              </ul>
+            )}
+          </StatusBanner>
+          <OriginalViewer pages={prepared.pages} />
         </div>
       )}
 
-      {result && (
-        <div className="mt-6 space-y-4">
-          <h2 className="text-xl font-bold">Medicines Found ({result.medicines.length})</h2>
-
-          {!isEmpty(result.interactions) && (
-            <div className="rounded-xl border-2 border-warning bg-warning/10 p-4">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 shrink-0 text-warning" />
-                <div className="min-w-0">
-                  <p className="font-bold text-warning">⚠️ Drug Interaction Detected</p>
-                  <p className="urdu text-sm font-semibold text-warning">ادویات کا باہمی تعامل</p>
-                  <p className="mt-2 text-sm">{result.interactions}</p>
-                  {!isEmpty(result.interactions_urdu) && (
-                    <p className="urdu mt-1 text-sm">{result.interactions_urdu}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="grid gap-3">
-            {result.medicines.map((m, i) => (
-              <div
-                key={i}
-                className={`rounded-2xl border bg-card p-5 shadow-sm ${
-                  m.is_dangerous ? "border-2 border-destructive" : "border-border"
-                }`}
+      {result && prepared && usable && (
+        <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]">
+          <OriginalViewer pages={prepared.pages} className="@4xl:sticky @4xl:top-6" />
+          <div className="space-y-5">
+            {medicines.length === 0 ? (
+              <StatusBanner tone="info" title={t("prescription.noneTitle")}>
+                {t("rx.readNoneBody")}
+              </StatusBanner>
+            ) : (
+              <StatusBanner
+                tone="info"
+                title={t("rx.readSummaryTitle", { count: medicines.length })}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="text-lg font-bold">
-                      <span className="text-primary">{i + 1}.</span> {m.name}
-                    </h3>
-                    {!isEmpty(m.name_urdu) && <p className="urdu text-base">{m.name_urdu}</p>}
-                  </div>
-                  {m.is_dangerous && (
-                    <span className="shrink-0 rounded-full bg-destructive/10 px-2 py-1 text-xs font-semibold text-destructive">
-                      Caution
-                    </span>
-                  )}
-                </div>
+                {t("rx.readSummaryBody")}
+              </StatusBanner>
+            )}
+            {medicines.length > 0 && (
+              <ReadAloud
+                text={() =>
+                  [
+                    t("rx.readSummaryTitle", { count: medicines.length }) + ".",
+                    ...medicines.map((m, i) => {
+                      const n = m.fields.name;
+                      const name = n.value && n.status !== "unreadable" ? n.value : t("rx.nameUnreadable");
+                      const unsure = n.status === "uncertain" ? ` (${t("rx.read.uncertain")})` : "";
+                      return `${i + 1}. ${name}${unsure}.`;
+                    }),
+                    t("rx.readSummaryBody"),
+                  ].join(" ")
+                }
+              />
+            )}
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <Row icon="💊" enLabel="Dosage" urLabel="خوراک" en={m.dosage} ur={m.dosage_urdu} />
-                  <Row icon="⏰" enLabel="Frequency" urLabel="وقت" en={m.frequency} ur={m.frequency_urdu} />
-                  <Row icon="📅" enLabel="Duration" urLabel="مدت" en={m.duration} ur={m.duration_urdu} />
-                  <Row icon="🍽️" enLabel="Instructions" urLabel="ہدایت" en={m.instructions} ur={m.instructions_urdu} />
-                  {!isEmpty(m.warnings) && (
-                    <div className="sm:col-span-2">
-                      <Row icon="⚠️" enLabel="Warnings" urLabel="احتیاط" en={m.warnings} ur={m.warnings_urdu} danger />
-                    </div>
+            {savedId ? (
+              <StatusBanner
+                tone="success"
+                title={t("rx.save.done")}
+                action={
+                  <>
+                    <Link
+                      to="/prescriptions/$id"
+                      params={{ id: savedId }}
+                      className={buttonVariants({ size: "sm" })}
+                    >
+                      <FileText aria-hidden="true" /> {t("rx.openPrescription")}
+                    </Link>
+                    {medicines.length > 0 && (
+                      <Link
+                        to="/medicines"
+                        hash={`rx-${savedId}`}
+                        className={buttonVariants({ size: "sm", variant: "outline" })}
+                      >
+                        <Pill aria-hidden="true" /> {t("rx.checkMedicines")}
+                      </Link>
+                    )}
+                    <Button variant="outline" size="sm" onClick={reset}>
+                      <RefreshCcw aria-hidden="true" /> {t("scan.again")}
+                    </Button>
+                  </>
+                }
+              >
+                <ul className="space-y-1">
+                  <li className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-success" aria-hidden="true" />
+                    {t("rx.save.doneOriginal")}
+                  </li>
+                  {medicines.length > 0 && (
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-success" aria-hidden="true" />
+                      {t("rx.save.doneMedicines", { count: medicines.length })}
+                    </li>
                   )}
+                </ul>
+                {medicines.length > 0 && <p className="mt-2">{t("rx.save.doneBody")}</p>}
+              </StatusBanner>
+            ) : (
+              <div className="panel space-y-4">
+                <div className="space-y-1.5">
+                  <label htmlFor="rx-doctor" className="field-label">
+                    {t("rx.doctorName")}
+                  </label>
+                  <Input
+                    id="rx-doctor"
+                    value={doctorName}
+                    maxLength={120}
+                    dir="auto"
+                    autoComplete="off"
+                    disabled={saving}
+                    aria-describedby="rx-doctor-hint"
+                    onChange={(e) => setDoctorName(e.target.value)}
+                  />
+                  <p id="rx-doctor-hint" className="text-sm text-muted-foreground">
+                    {t("rx.doctorNameHint")}
+                  </p>
                 </div>
+                <p className="text-[0.9375rem] text-muted-foreground">{t("rx.save.explain")}</p>
+                <div className="flex flex-wrap gap-3">
+                  <Button size="lg" disabled={saving} aria-busy={saving} onClick={save}>
+                    {saving ? (
+                      <Loader2 className="animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Save aria-hidden="true" />
+                    )}
+                    {saveState === "failed" ? t("rx.save.retry") : t("rx.save.button")}
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    disabled={saving}
+                    onClick={() => setConfirmReset(true)}
+                  >
+                    <RefreshCcw aria-hidden="true" /> {t("scan.again")}
+                  </Button>
+                </div>
+                <p
+                  role="status"
+                  className="min-h-6 text-[0.9375rem] font-medium"
+                  data-save-state={saveState}
+                >
+                  {saving && saveStage ? t(STAGE_PROGRESS_KEY[saveStage]) : ""}
+                </p>
+                {saveError && !saving && (
+                  <StatusBanner
+                    tone="danger"
+                    title={t(SAVE_STAGE_KEY[saveError.stage])}
+                    action={
+                      <Button variant="outline" size="sm" onClick={save}>
+                        <RefreshCcw aria-hidden="true" /> {t("root.tryAgain")}
+                      </Button>
+                    }
+                  >
+                    <p>{t(SAVE_REASON_KEY[saveError.reason])}</p>
+                    <p className="mt-2 font-medium">
+                      {partial ? t("rx.save.partialKept") : t("rx.save.nothingSaved")}
+                    </p>
+                  </StatusBanner>
+                )}
               </div>
-            ))}
-          </div>
-
-          {!isEmpty(result.doctor_notes) && (
-            <div className="rounded-xl border border-border bg-secondary/40 p-4">
-              <p className="text-sm font-semibold">Doctor's Notes:</p>
-              <p className="urdu text-sm font-semibold">ڈاکٹر کی ہدایات</p>
-              <p className="mt-2 text-sm">{result.doctor_notes}</p>
-              {!isEmpty(result.doctor_notes_urdu) && (
-                <p className="urdu mt-1 text-sm">{result.doctor_notes_urdu}</p>
-              )}
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-3 pt-2">
-            <button
-              disabled={saving || saved} onClick={saveAll}
-              className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {saved ? "✅ All medicines saved!" : "Save All to History"}
-            </button>
-            <button
-              onClick={reset}
-              className="flex items-center gap-2 rounded-lg border border-border bg-card px-5 py-2.5 font-medium hover:bg-accent"
-            >
-              <RefreshCcw className="h-4 w-4" /> Scan Again
-            </button>
+            )}
           </div>
         </div>
       )}
-    </div>
-  );
-}
 
-function Row({
-  icon, enLabel, urLabel, en, ur, danger,
-}: { icon: string; enLabel: string; urLabel: string; en?: string; ur?: string; danger?: boolean }) {
-  return (
-    <div>
-      <p className={`text-sm ${danger ? "text-destructive" : ""}`}>
-        <span className="mr-1">{icon}</span>
-        <span className="font-semibold">{enLabel}:</span> {en}
-      </p>
-      {!isEmpty(ur) && (
-        <p className={`urdu text-sm ${danger ? "text-destructive" : ""}`}>
-          <span className="font-semibold">{urLabel}:</span> {ur}
-        </p>
-      )}
-    </div>
+      <ConfirmDialog
+        open={confirmReset}
+        onOpenChange={setConfirmReset}
+        title={t("scan.discardTitle")}
+        body={partial ? t("rx.discardPartialBody") : t("rx.discardBody")}
+        confirmLabel={t("scan.discardConfirm")}
+        cancelLabel={t("scan.discardCancel")}
+        onConfirm={reset}
+      />
+    </PageEnter>
   );
 }

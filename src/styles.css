@@ -32,81 +32,560 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-lavender: var(--lavender);
+  --color-coral: var(--coral);
+  --color-coral-ink: var(--coral-ink);
+  --color-ink: var(--foreground);
+  --font-sans: "Atkinson Hyperlegible Next", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Hedvig Letters Serif", Georgia, "Times New Roman", serif;
   --font-urdu: "Noto Nastaliq Urdu", "Jameel Noori Nastaleeq", serif;
 }
 
 :root {
   --radius: 0.75rem;
-  --background: oklch(0.99 0.005 240);
-  --foreground: oklch(0.18 0.04 250);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.04 250);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.04 250);
-  --primary: oklch(0.55 0.2 260);           /* medical blue #2563EB */
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.96 0.015 250);
-  --secondary-foreground: oklch(0.25 0.05 260);
-  --muted: oklch(0.96 0.01 250);
-  --muted-foreground: oklch(0.5 0.03 250);
-  --accent: oklch(0.94 0.04 220);
-  --accent-foreground: oklch(0.25 0.08 260);
-  --destructive: oklch(0.58 0.23 25);        /* red #DC2626 */
-  --destructive-foreground: oklch(0.99 0 0);
-  --success: oklch(0.62 0.18 145);           /* green #16A34A */
-  --success-foreground: oklch(0.99 0 0);
-  --warning: oklch(0.72 0.16 80);            /* amber #CA8A04 */
-  --warning-foreground: oklch(0.2 0.05 80);
-  --border: oklch(0.9 0.015 250);
-  --input: oklch(0.9 0.015 250);
-  --ring: oklch(0.55 0.2 260);
-  --sidebar: oklch(0.99 0.005 240);
-  --sidebar-foreground: oklch(0.18 0.04 250);
-  --sidebar-primary: oklch(0.55 0.2 260);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.96 0.015 250);
-  --sidebar-accent-foreground: oklch(0.25 0.05 260);
-  --sidebar-border: oklch(0.9 0.015 250);
-  --sidebar-ring: oklch(0.55 0.2 260);
-}
-
-.dark {
-  --background: oklch(0.15 0.03 250);
-  --foreground: oklch(0.98 0.005 250);
-  --card: oklch(0.2 0.03 250);
-  --card-foreground: oklch(0.98 0.005 250);
-  --popover: oklch(0.2 0.03 250);
-  --popover-foreground: oklch(0.98 0.005 250);
-  --primary: oklch(0.65 0.2 260);
-  --primary-foreground: oklch(0.15 0.03 250);
-  --secondary: oklch(0.25 0.03 250);
-  --secondary-foreground: oklch(0.98 0.005 250);
-  --muted: oklch(0.25 0.03 250);
-  --muted-foreground: oklch(0.7 0.02 250);
-  --accent: oklch(0.3 0.06 260);
-  --accent-foreground: oklch(0.98 0.005 250);
-  --destructive: oklch(0.62 0.22 25);
-  --destructive-foreground: oklch(0.99 0 0);
-  --success: oklch(0.65 0.18 145);
-  --success-foreground: oklch(0.99 0 0);
-  --warning: oklch(0.75 0.16 80);
-  --warning-foreground: oklch(0.15 0.03 250);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.65 0.2 260);
+  /* A near-white ground with the faintest lavender cast, white surfaces and violet ink.
+     Coral is reserved for emphasis. */
+  --background: #fbfafd;
+  --foreground: #2a1a4a;
+  --card: #ffffff;
+  --card-foreground: #2a1a4a;
+  --popover: #ffffff;
+  --popover-foreground: #2a1a4a;
+  --primary: #4b2e83;
+  --primary-foreground: #ffffff;
+  --secondary: #f3effb;
+  --secondary-foreground: #33205c;
+  --muted: #f3eff7;
+  --muted-foreground: #5a4e6e;
+  --accent: #e7e0fa;
+  --accent-foreground: #33205c;
+  --lavender: #c9bbf0;
+  --coral: #f4845f;
+  --coral-ink: #a93718;
+  --destructive: #b3261e;
+  --destructive-foreground: #ffffff;
+  --success: #1e6f47;
+  --success-foreground: #ffffff;
+  --warning: #7d5100;
+  --warning-foreground: #ffffff;
+  --border: #e6e0f0;
+  /* Control borders meet the 3:1 non-text contrast requirement (WCAG 1.4.11). */
+  --input: #8f80af;
+  --ring: #4b2e83;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #2a1a4a;
+  --sidebar-primary: #4b2e83;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e7e0fa;
+  --sidebar-accent-foreground: #33205c;
+  --sidebar-border: #e2daee;
+  --sidebar-ring: #4b2e83;
 }
 
 @layer base {
-  * { border-color: var(--color-border); }
+  * {
+    border-color: var(--color-border);
+  }
+  html {
+    scroll-padding-top: 6rem;
+    -webkit-text-size-adjust: 100%;
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
-    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--font-sans);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  :focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+  }
+  .on-dark :focus-visible {
+    outline-color: #ffffff;
   }
   .urdu {
     direction: rtl;
+    text-align: start;
     font-family: var(--font-urdu);
     font-size: 1.15em;
     line-height: 1.9;
   }
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+}
+
+@layer components {
+  /* Radii step down with hierarchy: sections > panels > controls. */
+  /* White surface, hairline border, and a shadow that is a tint rather than a smudge. */
+  .panel {
+    border: 1px solid var(--border);
+    border-radius: 1.5rem;
+    background: var(--card);
+    padding: 1.25rem;
+    box-shadow:
+      0 1px 2px rgb(42 26 74 / 0.04),
+      0 18px 40px -30px rgb(75 46 131 / 0.32);
+  }
+  @media (min-width: 768px) {
+    .panel {
+      padding: 1.75rem;
+    }
+  }
+  /* Highlighted regions: a soft lavender wash that fades toward white. */
+  .panel-tint {
+    border: 1px solid rgb(201 187 240 / 0.45);
+    border-radius: 1.5rem;
+    background: linear-gradient(135deg, #f1ebfc 0%, #f7f4fd 55%, #fbfafe 100%);
+    padding: 1.25rem;
+  }
+  @media (min-width: 768px) {
+    .panel-tint {
+      padding: 1.75rem;
+    }
+  }
+  .display {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    line-height: 1.08;
+  }
+  .field-label {
+    display: block;
+    margin-bottom: 0.375rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+  }
+  .native-select {
+    min-height: 3rem;
+    width: 100%;
+    border: 1px solid var(--input);
+    border-radius: 0.75rem;
+    background-color: var(--card);
+    padding-inline: 0.875rem;
+  }
+  .skip-link {
+    position: absolute;
+    inset-inline-start: 1rem;
+    top: -5rem;
+    z-index: 100;
+    border-radius: 9999px;
+    background: var(--primary);
+    padding: 0.75rem 1.25rem;
+    color: var(--primary-foreground);
+    font-weight: 600;
+  }
+  .skip-link:focus {
+    top: 1rem;
+  }
+}
+
+/* The app's backdrop: a faint lavender light from the top of the content area that settles
+   into white. It scrolls with the page (not background-attachment: fixed), so it costs
+   nothing per frame. */
+.app-canvas {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(56rem 24rem at 88% -8rem, rgb(201 187 240 / 0.32), transparent 70%),
+    radial-gradient(40rem 20rem at 0% -6rem, rgb(231 224 250 / 0.55), transparent 70%);
+  background-repeat: no-repeat;
+}
+
+/* Primary actions: solid violet with a soft top highlight, so the colour still transitions
+   smoothly on hover (a gradient alone can't be transitioned). */
+.btn-primary-sheen {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0) 60%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    0 8px 18px -12px rgb(75 46 131 / 0.85);
+}
+
+/* Press and lift respond to the person's action, on the compositor only.
+   The lift shadow is painted once on a pseudo-element and faded, never re-rastered. */
+.press {
+  transition-property: background-color, color, border-color, transform;
+  transition-duration: 150ms;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+.press:active {
+  transform: scale(0.97);
+}
+.lift {
+  position: relative;
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lift::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  box-shadow: 0 16px 36px -14px rgb(75 46 131 / 0.3);
+  opacity: 0;
+  transition: opacity 200ms ease;
+  pointer-events: none;
+}
+@media (hover: hover) {
+  .lift:hover {
+    transform: translateY(-3px);
+  }
+  .lift:hover::after {
+    opacity: 1;
+  }
+}
+
+/* Scroll reveals (landing page). Uses the independent `translate` property so it never
+   fights the `transform` used by .lift hover, and lists all three in one transition. */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal-pending {
+    opacity: 0;
+    translate: 0 24px;
+    transition:
+      opacity 600ms cubic-bezier(0.16, 1, 0.3, 1),
+      translate 600ms cubic-bezier(0.16, 1, 0.3, 1),
+      transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .reveal-pending.is-revealed {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+/* Indeterminate progress: a transform-only sweep inside a clipped track. */
+.progress-track {
+  height: 0.375rem;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: var(--accent);
+}
+.progress-sweep {
+  height: 100%;
+  width: 40%;
+  border-radius: inherit;
+  background: var(--primary);
+  animation: progress-sweep 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes progress-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(260%);
+  }
+}
+[dir="rtl"] .progress-sweep {
+  animation-name: progress-sweep-rtl;
+}
+@keyframes progress-sweep-rtl {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(-260%);
+  }
+}
+
+/* Listening indicator on the diary microphone. */
+.mic-pulse::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: var(--coral);
+  opacity: 0.45;
+  animation: mic-pulse 1.5s ease-out infinite;
+}
+@keyframes mic-pulse {
+  to {
+    transform: scale(1.45);
+    opacity: 0;
+  }
+}
+
+/* Landing hero: a soft lavender light from the photo's side, warm ground elsewhere. */
+.hero-wash {
+  background:
+    radial-gradient(60rem 36rem at 85% 10%, rgb(201 187 240 / 0.45), transparent 60%),
+    radial-gradient(40rem 30rem at 5% 90%, rgb(244 132 95 / 0.1), transparent 60%),
+    var(--background);
+}
+[dir="rtl"] .hero-wash {
+  background:
+    radial-gradient(60rem 36rem at 15% 10%, rgb(201 187 240 / 0.45), transparent 60%),
+    radial-gradient(40rem 30rem at 95% 90%, rgb(244 132 95 / 0.1), transparent 60%),
+    var(--background);
+}
+/* The curtain is lifted by default so the photo shows without JavaScript; it only covers
+   the photo before paint when the hero is about to animate. */
+.hero-curtain {
+  transform: translateY(-101%);
+}
+html.motion-ok .hero-curtain {
+  transform: none;
+}
+
+/* Hero content stays visible without JavaScript. MOTION_BOOT_SCRIPT adds this class
+   before paint only when motion is allowed, and the hero removes it on hydrate. */
+html.motion-ok [data-hero] {
+  visibility: hidden;
+}
+
+/* Reduced motion degrades in tiers rather than removing everything: movement goes,
+   fades and spinners remain so changes still read and progress is still shown. */
+@media (prefers-reduced-motion: reduce) {
+  .press:active,
+  .lift:hover {
+    transform: none;
+  }
+  .mic-pulse::before {
+    animation: none;
+    opacity: 0.25;
+    transform: scale(1.2);
+  }
+  .progress-sweep {
+    width: 100%;
+    animation: progress-fade 1.6s ease-in-out infinite alternate;
+  }
+  [dir="rtl"] .progress-sweep {
+    animation-name: progress-fade;
+  }
+  .animate-spin {
+    animation-duration: 1.6s;
+  }
+}
+@keyframes progress-fade {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Nastaliq is much taller than Latin text, so it needs more line height than the
+   text-* utilities set. Deliberately outside @layer so it overrides them. */
+html[lang="ur"] body {
+  /* Sans-serif fallback so Latin medicine names and doses stay clean and legible. */
+  font-family: "Noto Nastaliq Urdu", ui-sans-serif, system-ui, sans-serif;
+}
+html[lang="ur"] body * {
+  line-height: 1.9;
+}
+html[lang="ur"] .display {
+  font-family: "Noto Nastaliq Urdu", var(--font-display);
+  letter-spacing: 0;
+  line-height: 1.6;
+}
+html[lang="ur"] h1.display {
+  font-size: clamp(2rem, 3.6vw, 3.25rem);
+}
+html[lang="ar"] .display,
+html[lang="hi"] .display,
+html[lang="zh"] .display {
+  letter-spacing: 0;
+  line-height: 1.25;
+}
+
+/* Set by LANGUAGE_BOOT_SCRIPT until a returning user's language has been applied. */
+html.i18n-pending body {
+  visibility: hidden;
+}
+html.i18n-pending::before {
+  content: "";
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: -0.75rem;
+  border: 2px solid var(--primary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: i18n-spin 0.8s linear infinite;
+}
+@keyframes i18n-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Toast rich colours: sonner's default green, red and amber text fall below 4.5:1 on their
+   tinted backgrounds. These use the app's own darker status inks instead. */
+html [data-sonner-toaster][data-sonner-theme="light"] {
+  --success-text: #1e6f47;
+  --error-text: #a3201c;
+  --warning-text: #7d5100;
+  --info-text: #2a1a4a;
+}
+
+/* Guided tour on phones: room below the page so a highlighted element can scroll above
+   the bottom sheet. Only present while the tour is open. */
+.tour-sheet-space body {
+  padding-bottom: 60vh;
+}
+
+/* My Medicines: the chosen Taken / Not taken / Not sure icon settles in with a short pop.
+   Transform and opacity only; skipped entirely when reduced motion is requested. */
+@media (prefers-reduced-motion: no-preference) {
+  .intake-pop {
+    animation: intake-pop 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+}
+@keyframes intake-pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Guided tour: one card and one spotlight that glide together from step to step.
+   Position and size are written by GSAP; only transform, opacity and the spotlight's
+   box change per frame. */
+.tour-spot {
+  position: fixed;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  border-radius: 20px;
+  /* The dim layer is the hole's own shadow, so the cut-out never misaligns with it. */
+  box-shadow: 0 0 0 200vmax rgb(24 14 46 / 0.44);
+  will-change: transform;
+}
+.tour-spot-ring,
+.tour-spot-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.tour-spot-ring {
+  box-shadow:
+    0 0 0 2px rgb(185 166 238),
+    0 0 0 6px rgb(185 166 238 / 0.22),
+    0 0 32px 4px rgb(150 120 228 / 0.34);
+}
+.tour-spot-pulse {
+  box-shadow: 0 0 0 2px rgb(201 187 240 / 0.9);
+}
+
+.tour-card {
+  background: var(--card);
+  border: 1px solid #dcd0f3;
+  border-radius: 1.375rem;
+  box-shadow:
+    0 1px 2px rgb(54 33 95 / 0.08),
+    0 20px 44px -18px rgb(36 20 70 / 0.5);
+  will-change: transform;
+}
+.tour-card[data-sheet] {
+  border-width: 1px 0 0;
+  border-radius: 1.5rem 1.5rem 0 0;
+  box-shadow: 0 -18px 44px -20px rgb(36 20 70 / 0.5);
+}
+
+/* The pointer: an arrow in the gap between the card and the control, pointing at the
+   control. It draws in once, nudges toward the control twice, then stays still. */
+.tour-pointer {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 82;
+  pointer-events: none;
+  overflow: visible;
+  color: #ffffff;
+  filter: drop-shadow(0 0 1.5px rgb(54 33 95)) drop-shadow(0 2px 4px rgb(24 14 46 / 0.6));
+}
+.tour-pointer[data-dir="none"] { display: none; }
+.tour-pointer path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tour-pointer[data-anim] path {
+    stroke-dasharray: 160;
+    animation: tour-draw 0.38s ease-out both;
+  }
+  .tour-pointer[data-anim][data-dir="up"] { --nx: 0px; --ny: -4px; }
+  .tour-pointer[data-anim][data-dir="down"] { --nx: 0px; --ny: 4px; }
+  .tour-pointer[data-anim][data-dir="left"] { --nx: -4px; --ny: 0px; }
+  .tour-pointer[data-anim][data-dir="right"] { --nx: 4px; --ny: 0px; }
+  .tour-pointer[data-anim] path:last-child { animation: tour-draw 0.38s ease-out both, tour-nudge 0.7s ease-in-out 0.4s 2; }
+}
+@keyframes tour-draw {
+  from { stroke-dashoffset: 160; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes tour-nudge {
+  50% { transform: translate(var(--nx), var(--ny)); }
+}
+/* The phone sheet moved to the top of the screen (for a control at the bottom). */
+.tour-card[data-sheet][data-tour-side="sheetTop"] {
+  border-width: 0 0 1px;
+  border-radius: 0 0 1.5rem 1.5rem;
+  box-shadow: 0 18px 44px -20px rgb(36 20 70 / 0.5);
+}
+
+.tour-track {
+  position: relative;
+  height: 4px;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #ece6f8;
+}
+.tour-track-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7b5cc4, #4b2e83);
+  transform-origin: left center;
+}
+[dir="rtl"] .tour-track-fill {
+  transform-origin: right center;
+  background: linear-gradient(270deg, #7b5cc4, #4b2e83);
+}
+
+.tour-icon {
+  display: grid;
+  height: 2.25rem;
+  width: 2.25rem;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 0.75rem;
+  background: var(--accent);
+  color: var(--primary);
+}
+
+.tour-pill {
+  position: fixed;
+  left: 50%;
+  top: 45%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transform: translateX(-50%);
+  border: 1px solid #e3daf6;
+  border-radius: 999px;
+  background: #fff;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  box-shadow: 0 10px 30px -12px rgb(36 20 70 / 0.45);
 }

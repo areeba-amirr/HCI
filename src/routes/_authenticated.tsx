@@ -2,28 +2,119 @@ import { createFileRoute, Outlet, Link, useNavigate, useRouterState } from "@tan
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import { Pill, ScanLine, FileText, Mic, History, FileBarChart, LogOut, Loader2, Menu, X } from "lucide-react";
+import {
+  ArrowLeftRight,
+  CalendarDays,
+  Compass,
+  Settings,
+  FileBarChart,
+  FileText,
+  History,
+  Home,
+  Loader2,
+  LogOut,
+  Menu,
+  Mic,
+  Pill,
+  ScanLine,
+} from "lucide-react";
 import { toast } from "sonner";
+import { useI18n } from "@/i18n/I18nProvider";
+import { LanguageSelector } from "@/components/LanguageSelector";
+import { Logo } from "@/components/brand/Logo";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { TourProvider, useTour } from "@/components/tour/Tour";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthLayout,
 });
 
-const NAV = [
-  { to: "/dashboard", label: "Dashboard", icon: Pill },
-  { to: "/scanner", label: "Scan Medicine", icon: ScanLine },
-  { to: "/prescription", label: "Prescription", icon: FileText },
-  { to: "/diary", label: "Symptom Diary", icon: Mic },
-  { to: "/history", label: "History", icon: History },
-  { to: "/report", label: "Doctor Report", icon: FileBarChart },
+const HOME = { to: "/dashboard", label: "nav.dashboard", icon: Home } as const;
+const UNDERSTAND = [
+  { to: "/scanner", label: "nav.scanner", icon: ScanLine },
+  { to: "/prescription", label: "nav.prescription", icon: FileText },
+  { to: "/interactions", label: "nav.interactions", icon: ArrowLeftRight },
 ] as const;
+const TRACK = [
+  { to: "/medicines", label: "nav.medicines", icon: Pill },
+  { to: "/diary", label: "nav.diary", icon: Mic },
+  { to: "/calendar", label: "nav.calendar", icon: CalendarDays },
+  { to: "/history", label: "nav.history", icon: History },
+  { to: "/report", label: "nav.report", icon: FileBarChart },
+] as const;
+const SETTINGS = { to: "/settings", label: "nav.settings", icon: Settings } as const;
+// Everyday tasks stay one thumb-tap away on phones; the rest sit behind "More".
+const BOTTOM_BAR = [
+  { ...HOME, short: "nav.shortHome" },
+  { ...UNDERSTAND[0], short: "nav.shortScan" },
+  { ...UNDERSTAND[1], short: "nav.prescription" },
+  { ...TRACK[1], short: "nav.shortDiary" },
+] as const;
+const IN_MORE = [UNDERSTAND[2], TRACK[0], TRACK[2], TRACK[3], TRACK[4], SETTINGS] as const;
+
+type NavItem = (typeof UNDERSTAND)[number] | (typeof TRACK)[number] | typeof HOME | typeof SETTINGS;
+
+function NavLink({ item, path }: { item: NavItem; path: string }) {
+  const { t } = useI18n();
+  const active = path === item.to;
+  const Icon = item.icon;
+  return (
+    <Link
+      to={item.to}
+      aria-current={active ? "page" : undefined}
+      className={`press flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 font-medium transition-colors duration-150 ${
+        active
+          ? "btn-primary-sheen bg-primary text-primary-foreground"
+          : "text-foreground/85 hover:bg-accent hover:text-foreground"
+      }`}
+    >
+      <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+      {t(item.label)}
+    </Link>
+  );
+}
+
+function TourButton({ onStart }: { onStart?: () => void }) {
+  const { t } = useI18n();
+  const { startFull, record } = useTour();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        onStart?.();
+        startFull(record?.status === "paused" ? record.stepId : undefined);
+      }}
+      className="press flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2 text-start font-medium text-foreground/85 transition-colors duration-150 hover:bg-accent hover:text-foreground"
+    >
+      <Compass className="h-5 w-5 shrink-0" aria-hidden="true" />
+      {t("tour.takeTour")}
+    </button>
+  );
+}
+
+function Account({ user, onLogout }: { user: User; onLogout: () => void }) {
+  const { t } = useI18n();
+  return (
+    <div className="panel-tint !p-4">
+      <p className="text-sm text-muted-foreground">{t("nav.signedInAs")}</p>
+      <p dir="ltr" translate="no" className="truncate text-start font-medium" title={user.email}>
+        {user.email}
+      </p>
+      <Button variant="outline" onClick={onLogout} className="mt-3 w-full">
+        <LogOut className="rtl:rotate-180" aria-hidden="true" /> {t("nav.signOut")}
+      </Button>
+    </div>
+  );
+}
 
 function AuthLayout() {
   const navigate = useNavigate();
+  const { t, dir } = useI18n();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -38,71 +129,152 @@ function AuthLayout() {
       setLoading(false);
       if (!data.session) navigate({ to: "/login" });
     });
-    return () => { mounted = false; sub.subscription.unsubscribe(); };
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
   }, [navigate]);
 
-  useEffect(() => { setMenuOpen(false); }, [path]);
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [path]);
 
   async function logout() {
     await supabase.auth.signOut();
-    toast.success("Signed out");
+    toast.success(t("nav.signedOut"));
     navigate({ to: "/login" });
   }
 
   if (loading) {
-    return <div className="grid min-h-screen place-items-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
+    return (
+      <div role="status" className="grid min-h-screen place-items-center">
+        <Loader2 className="h-7 w-7 animate-spin text-primary" aria-hidden="true" />
+        <span className="sr-only">{t("common.loading")}</span>
+      </div>
+    );
   }
   if (!user) return null;
 
-  return (
-    <div className="min-h-screen bg-secondary/30">
-      {/* Top bar (mobile) */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-card px-4 py-3 md:hidden">
-        <Link to="/dashboard" className="flex items-center gap-2">
-          <div className="grid h-8 w-8 place-items-center rounded-lg bg-primary text-primary-foreground"><Pill className="h-4 w-4" /></div>
-          <span className="font-bold">MediSnap</span>
-        </Link>
-        <button onClick={() => setMenuOpen((o) => !o)} className="rounded-md p-2 hover:bg-accent">
-          {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
-      </header>
+  const moreActive = IN_MORE.some((item) => item.to === path);
 
-      <div className="mx-auto flex max-w-7xl">
-        {/* Sidebar */}
-        <aside className={`${menuOpen ? "block" : "hidden"} md:block fixed md:sticky md:top-0 inset-x-0 top-[57px] md:inset-auto md:h-screen z-20 w-full md:w-64 shrink-0 border-r border-border bg-card`}>
-          <div className="flex h-full flex-col p-4">
-            <Link to="/dashboard" className="mb-6 hidden items-center gap-2 md:flex">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground"><Pill className="h-5 w-5" /></div>
-              <span className="text-lg font-bold">MediSnap</span>
-            </Link>
-            <nav className="flex flex-col gap-1">
-              {NAV.map(({ to, label, icon: Icon }) => {
-                const active = path === to;
-                return (
-                  <Link key={to} to={to}
-                    className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                      active ? "bg-primary text-primary-foreground" : "text-foreground/80 hover:bg-accent"
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" /> {label}
-                  </Link>
-                );
-              })}
-            </nav>
-            <div className="mt-auto rounded-lg border border-border bg-secondary/50 p-3">
-              <p className="truncate text-xs text-muted-foreground">Signed in as</p>
-              <p className="truncate text-sm font-medium">{user.email}</p>
-              <button onClick={logout} className="mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-border bg-card px-3 py-2 text-sm font-medium hover:bg-accent">
-                <LogOut className="h-4 w-4" /> Sign out
-              </button>
+  return (
+    <TourProvider user={user}>
+      <div id="app-shell" className="min-h-screen md:flex">
+        {/* Desktop navigation: grouped so six destinations read as two short lists. */}
+        <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col gap-5 overflow-y-auto border-e border-border bg-[linear-gradient(180deg,#FFFFFF_0%,#FBF9FE_45%,#F3EEFC_100%)] p-5 md:flex">
+          <Link to="/dashboard" className="w-fit rounded-lg">
+            <Logo />
+          </Link>
+          <LanguageSelector className="w-full" />
+          <nav aria-label={t("nav.main")} className="flex flex-col gap-4" data-tour="nav-side">
+            <NavLink item={HOME} path={path} />
+            <div>
+              <p className="mb-1 px-3 text-sm font-semibold text-muted-foreground">
+                {t("nav.groupUnderstand")}
+              </p>
+              <div className="flex flex-col gap-1">
+                {UNDERSTAND.map((item) => (
+                  <NavLink key={item.to} item={item} path={path} />
+                ))}
+              </div>
             </div>
+            <div>
+              <p className="mb-1 px-3 text-sm font-semibold text-muted-foreground">
+                {t("nav.groupTrack")}
+              </p>
+              <div className="flex flex-col gap-1">
+                {TRACK.map((item) => (
+                  <NavLink key={item.to} item={item} path={path} />
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-1 px-3 text-sm font-semibold text-muted-foreground">
+                {t("nav.groupAccount")}
+              </p>
+              <NavLink item={SETTINGS} path={path} />
+              <TourButton />
+            </div>
+          </nav>
+          <div className="mt-auto">
+            <Account user={user} onLogout={logout} />
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1 px-4 py-6 md:px-8 md:py-10">
-          <Outlet />
-        </main>
+        <div className="app-canvas min-w-0 flex-1">
+          <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-border bg-card px-4 py-2.5 md:hidden">
+            <Link to="/dashboard" className="shrink-0 rounded-lg">
+              <Logo />
+            </Link>
+            <LanguageSelector />
+          </header>
+
+          <main
+            id="main"
+            className="mx-auto w-full max-w-[90rem] px-4 pb-28 pt-6 md:px-8 md:pb-12 md:pt-10"
+          >
+            <Outlet />
+          </main>
+        </div>
+
+        {/* Mobile navigation at the bottom, where thumbs reach. */}
+        <nav
+          aria-label={t("nav.main")}
+          className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] md:hidden"
+          data-tour="nav-bottom"
+        >
+          {BOTTOM_BAR.map((item) => {
+            const Icon = item.icon;
+            const active = path === item.to;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                aria-current={active ? "page" : undefined}
+                className={`press flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-1.5 text-center text-xs font-semibold ${
+                  active ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                <span
+                  className={`grid h-7 w-12 place-items-center rounded-full ${active ? "bg-accent" : ""}`}
+                >
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <span className="line-clamp-1 max-w-full">{t(item.short)}</span>
+              </Link>
+            );
+          })}
+          <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
+            <SheetTrigger
+              className={`press flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-1.5 text-xs font-semibold ${
+                moreActive ? "text-primary" : "text-muted-foreground"
+              }`}
+            >
+              <span
+                className={`grid h-7 w-12 place-items-center rounded-full ${moreActive ? "bg-accent" : ""}`}
+              >
+                <Menu className="h-5 w-5" aria-hidden="true" />
+              </span>
+              {t("nav.more")}
+            </SheetTrigger>
+            <SheetContent
+              side={dir === "rtl" ? "left" : "right"}
+              className="flex w-[85vw] max-w-sm flex-col gap-5 bg-card p-5"
+            >
+              <SheetTitle className="display pt-6 text-2xl font-normal">{t("nav.more")}</SheetTitle>
+              <nav aria-label={t("nav.more")} className="flex flex-col gap-1">
+                {IN_MORE.map((item) => (
+                  <NavLink key={item.to} item={item} path={path} />
+                ))}
+                <TourButton onStart={() => setMoreOpen(false)} />
+              </nav>
+              <div className="mt-auto">
+                <Account user={user} onLogout={logout} />
+              </div>
+            </SheetContent>
+          </Sheet>
+        </nav>
       </div>
-    </div>
+    </TourProvider>
   );
 }

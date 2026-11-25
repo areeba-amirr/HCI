@@ -8,42 +8,52 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { I18nProvider, useI18n } from "@/i18n/I18nProvider";
+import { DEFAULT_LANGUAGE, LANGUAGE_BOOT_SCRIPT } from "@/i18n/languages";
+import { MOTION_BOOT_SCRIPT } from "@/lib/motion-boot";
 
 import appCss from "../styles.css?url";
 
+const FONTS =
+  "https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;600;700&family=Hedvig+Letters+Serif:opsz@12..24&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap";
+
 function NotFoundComponent() {
+  const { t } = useI18n();
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <main id="main" className="flex min-h-screen items-center justify-center px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-primary">404</h1>
-        <h2 className="mt-4 text-xl font-semibold">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist.
-        </p>
-        <Link to="/" className="mt-6 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
-          Go home
+        <p className="display text-8xl text-primary">404</p>
+        <h1 className="display mt-4 text-3xl">{t("root.notFoundTitle")}</h1>
+        <p className="mt-2 text-muted-foreground">{t("root.notFoundBody")}</p>
+        <Link to="/" className={`mt-6 ${buttonVariants()}`}>
+          {t("root.goHome")}
         </Link>
       </div>
-    </div>
+    </main>
   );
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+  const { t, tError } = useI18n();
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <main id="main" className="flex min-h-screen items-center justify-center px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold">Something went wrong</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
-        <button
-          onClick={() => { router.invalidate(); reset(); }}
-          className="mt-6 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+        <h1 className="display text-3xl">{t("root.errorTitle")}</h1>
+        <p className="mt-2 text-muted-foreground">{tError(error.message)}</p>
+        <Button
+          className="mt-6"
+          onClick={() => {
+            router.invalidate();
+            reset();
+          }}
         >
-          Try again
-        </button>
+          {t("root.tryAgain")}
+        </Button>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -52,6 +62,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
+      // MediSnap translates itself; browser auto-translate could alter medical data.
+      { name: "google", content: "notranslate" },
+      { name: "theme-color", content: "#4b2e83" },
       { title: "MediSnap — Snap. Understand. Stay Safe." },
       { name: "description", content: "Understand English medicine labels & doctor prescriptions in Urdu. Track symptoms and generate doctor reports." },
       { property: "og:title", content: "MediSnap — Snap. Understand. Stay Safe." },
@@ -63,7 +76,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/fa2e198d-c6fe-4bc0-b5f6-b18d45e475be/id-preview-4a99f6ad--a4d5085c-8d09-4990-8ef6-6bf16dd5d96a.lovable.app-1778577255291.png" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
-    links: [{ rel: "stylesheet", href: appCss }, { rel: "preconnect", href: "https://fonts.googleapis.com" }, { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      { rel: "stylesheet", href: FONTS },
+    ],
   }),
   shellComponent: RootShell,
   component: RootComponent,
@@ -71,12 +89,27 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+function SkipLink() {
+  const { t } = useI18n();
+  return (
+    <a href="#main" className="skip-link">
+      {t("root.skipToContent")}
+    </a>
+  );
+}
+
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <head><HeadContent /></head>
+    <html lang={DEFAULT_LANGUAGE} dir="ltr" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: LANGUAGE_BOOT_SCRIPT + MOTION_BOOT_SCRIPT }} />
+        <HeadContent />
+      </head>
       <body>
-        {children}
+        <I18nProvider>
+          <SkipLink />
+          {children}
+        </I18nProvider>
         <Scripts />
       </body>
     </html>
@@ -85,10 +118,11 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const { dir } = useI18n();
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
-      <Toaster richColors position="top-right" />
+      <Toaster richColors dir={dir} position={dir === "rtl" ? "top-left" : "top-right"} />
     </QueryClientProvider>
   );
 }
