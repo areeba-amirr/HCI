@@ -9,25 +9,29 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SignupRouteImport } from './routes/signup'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
-import { Route as AuthenticatedScannerRouteImport } from './routes/_authenticated/scanner'
-import { Route as AuthenticatedReportRouteImport } from './routes/_authenticated/report'
-import { Route as AuthenticatedPrescriptionRouteImport } from './routes/_authenticated/prescription'
-import { Route as AuthenticatedMedicinesRouteImport } from './routes/_authenticated/medicines'
-import { Route as AuthenticatedInteractionsRouteImport } from './routes/_authenticated/interactions'
-import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
-import { Route as AuthenticatedDiaryRouteImport } from './routes/_authenticated/diary'
-import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedDiaryRouteImport } from './routes/_authenticated/diary'
+import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
+import { Route as AuthenticatedInteractionsRouteImport } from './routes/_authenticated/interactions'
+import { Route as AuthenticatedMedicinesRouteImport } from './routes/_authenticated/medicines'
+import { Route as AuthenticatedPrescriptionRouteImport } from './routes/_authenticated/prescription'
+import { Route as AuthenticatedReportRouteImport } from './routes/_authenticated/report'
+import { Route as AuthenticatedScannerRouteImport } from './routes/_authenticated/scanner'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedPrescriptionsIdRouteImport } from './routes/_authenticated/prescriptions.$id'
 
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -35,39 +39,29 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedRoute = AuthenticatedRouteImport.update({
-  id: '/_authenticated',
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
+const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedScannerRoute = AuthenticatedScannerRouteImport.update({
-  id: '/scanner',
-  path: '/scanner',
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedReportRoute = AuthenticatedReportRouteImport.update({
-  id: '/report',
-  path: '/report',
+const AuthenticatedDiaryRoute = AuthenticatedDiaryRouteImport.update({
+  id: '/diary',
+  path: '/diary',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedPrescriptionRoute =
-  AuthenticatedPrescriptionRouteImport.update({
-    id: '/prescription',
-    path: '/prescription',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedMedicinesRoute = AuthenticatedMedicinesRouteImport.update({
-  id: '/medicines',
-  path: '/medicines',
+const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedInteractionsRoute =
@@ -76,24 +70,30 @@ const AuthenticatedInteractionsRoute =
     path: '/interactions',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
-  id: '/history',
-  path: '/history',
+const AuthenticatedMedicinesRoute = AuthenticatedMedicinesRouteImport.update({
+  id: '/medicines',
+  path: '/medicines',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedDiaryRoute = AuthenticatedDiaryRouteImport.update({
-  id: '/diary',
-  path: '/diary',
+const AuthenticatedPrescriptionRoute =
+  AuthenticatedPrescriptionRouteImport.update({
+    id: '/prescription',
+    path: '/prescription',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedReportRoute = AuthenticatedReportRouteImport.update({
+  id: '/report',
+  path: '/report',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
+const AuthenticatedScannerRoute = AuthenticatedScannerRouteImport.update({
+  id: '/scanner',
+  path: '/scanner',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
-  id: '/calendar',
-  path: '/calendar',
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedPrescriptionsIdRoute =
@@ -214,18 +214,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -235,67 +228,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/settings': {
-      id: '/_authenticated/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
-      parentRoute: typeof AuthenticatedRoute
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/scanner': {
-      id: '/_authenticated/scanner'
-      path: '/scanner'
-      fullPath: '/scanner'
-      preLoaderRoute: typeof AuthenticatedScannerRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/report': {
-      id: '/_authenticated/report'
-      path: '/report'
-      fullPath: '/report'
-      preLoaderRoute: typeof AuthenticatedReportRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/prescription': {
-      id: '/_authenticated/prescription'
-      path: '/prescription'
-      fullPath: '/prescription'
-      preLoaderRoute: typeof AuthenticatedPrescriptionRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/medicines': {
-      id: '/_authenticated/medicines'
-      path: '/medicines'
-      fullPath: '/medicines'
-      preLoaderRoute: typeof AuthenticatedMedicinesRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/interactions': {
-      id: '/_authenticated/interactions'
-      path: '/interactions'
-      fullPath: '/interactions'
-      preLoaderRoute: typeof AuthenticatedInteractionsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/history': {
-      id: '/_authenticated/history'
-      path: '/history'
-      fullPath: '/history'
-      preLoaderRoute: typeof AuthenticatedHistoryRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/diary': {
-      id: '/_authenticated/diary'
-      path: '/diary'
-      fullPath: '/diary'
-      preLoaderRoute: typeof AuthenticatedDiaryRouteImport
+    '/_authenticated/calendar': {
+      id: '/_authenticated/calendar'
+      path: '/calendar'
+      fullPath: '/calendar'
+      preLoaderRoute: typeof AuthenticatedCalendarRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/dashboard': {
@@ -305,11 +256,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/calendar': {
-      id: '/_authenticated/calendar'
-      path: '/calendar'
-      fullPath: '/calendar'
-      preLoaderRoute: typeof AuthenticatedCalendarRouteImport
+    '/_authenticated/diary': {
+      id: '/_authenticated/diary'
+      path: '/diary'
+      fullPath: '/diary'
+      preLoaderRoute: typeof AuthenticatedDiaryRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/history': {
+      id: '/_authenticated/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof AuthenticatedHistoryRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/interactions': {
+      id: '/_authenticated/interactions'
+      path: '/interactions'
+      fullPath: '/interactions'
+      preLoaderRoute: typeof AuthenticatedInteractionsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/medicines': {
+      id: '/_authenticated/medicines'
+      path: '/medicines'
+      fullPath: '/medicines'
+      preLoaderRoute: typeof AuthenticatedMedicinesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/prescription': {
+      id: '/_authenticated/prescription'
+      path: '/prescription'
+      fullPath: '/prescription'
+      preLoaderRoute: typeof AuthenticatedPrescriptionRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/report': {
+      id: '/_authenticated/report'
+      path: '/report'
+      fullPath: '/report'
+      preLoaderRoute: typeof AuthenticatedReportRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/scanner': {
+      id: '/_authenticated/scanner'
+      path: '/scanner'
+      fullPath: '/scanner'
+      preLoaderRoute: typeof AuthenticatedScannerRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/prescriptions/$id': {
