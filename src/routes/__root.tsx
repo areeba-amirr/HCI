@@ -6,6 +6,7 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -34,15 +35,17 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+// The router types `error` as unknown: anything can be thrown, not only an Error.
+function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
   const { t, tError } = useI18n();
+  const message = error instanceof Error ? error.message : String(error);
   return (
     <main id="main" className="flex min-h-screen items-center justify-center px-4">
       <div className="max-w-md text-center">
         <h1 className="display text-3xl">{t("root.errorTitle")}</h1>
-        <p className="mt-2 text-muted-foreground">{tError(error.message)}</p>
+        <p className="mt-2 text-muted-foreground">{tError(message)}</p>
         <Button
           className="mt-6"
           onClick={() => {
